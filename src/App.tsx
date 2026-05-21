@@ -21,16 +21,16 @@ const THEMES: Record<ThemeKey, {
   'dark-blue':   { label: '🌙 ダーク青', bg: '#1a1d3a', surface: '#23274f', border: '#245d9b', text: '#f1f5f9', subtext: '#94a3b8', accent: '#38bdf8', headerBg: '#23274f', logo: '/ns_slitter_silver.png'},
   'dark-red':    { label: '🌙 ダーク赤', bg: '#200f0fff', surface: '#2d1515', border: '#5c2a2a', text: '#fef2f2', subtext: '#fca5a5', accent: '#f87171', headerBg: '#2d1515', logo: '/ns_slitter_silver.png'},
   'dark-green':  { label: '🌙 ダーク緑', bg: '#0a1a0f', surface: '#152d1e', border: '#1f4a30', text: '#f0fdf4', subtext: '#86efac', accent: '#34d399', headerBg: '#152d1e', logo: '/ns_slitter_silver.png' },
-  'light-blue':  { label: '☀️ ライト青', bg: '#eff6ff', surface: '#ffffff', border: '#bfdbfe', text: '#1e3a5f', subtext: '#3b82f6', accent: '#2563eb', headerBg: '#dbeafe', logo: '/image001.png' },
-  'light-red':   { label: '☀️ ライト赤', bg: '#fff1f2', surface: '#ffffff', border: '#fecdd3', text: '#4c0519', subtext: '#f43f5e', accent: '#e11d48', headerBg: '#ffe4e6' , logo: '/image001.png'},
-  'light-green': { label: '☀️ ライト緑', bg: '#f0fdf4', surface: '#ffffff', border: '#bbf7d0', text: '#14532d', subtext: '#16a34a', accent: '#15803d', headerBg: '#dcfce7' , logo: '/image001.png'},
+  'light-blue':  { label: '☀️ ライト青', bg: '#eff6ff', surface: '#ffffff', border: '#bfdbfe', text: '#1e3a5f', subtext: '#3b82f6', accent: '#2563eb', headerBg: '#dbeafe', logo: '/ns_slitter_red.png' },
+  'light-red':   { label: '☀️ ライト赤', bg: '#fff1f2', surface: '#ffffff', border: '#fecdd3', text: '#4c0519', subtext: '#f43f5e', accent: '#e11d48', headerBg: '#ffe4e6' , logo: '/ns_slitter_red.png'},
+  'light-green': { label: '☀️ ライト緑', bg: '#f0fdf4', surface: '#ffffff', border: '#bbf7d0', text: '#14532d', subtext: '#16a34a', accent: '#15803d', headerBg: '#dcfce7' , logo: '/ns_slitter_red.png'},
 }
 
 type PageKey = 'dashboard' | 'control'
 
 const PAGES: { key: PageKey; label: string; short: string }[] = [
-  { key: 'dashboard', label: '運転モニタ', short: '画面' },
-  { key: 'control',   label: '制御フロー', short: '制御' },
+  { key: 'dashboard', label: 'MONITOR', short: '画面' },
+  { key: 'control',   label: 'FLOW', short: '制御' },
 ]
 
 type DataPoint = { time: string; [key: string]: number | string }
@@ -405,7 +405,7 @@ export default function App() {
       <header style={{
         width: '100%',
         background: theme.headerBg,
-        borderBottom: `1px solid ${theme.border}`,
+        borderBottom: `none`,
         display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', padding: '8px 24px',
         position: 'sticky', top: 0, zIndex: 50,
@@ -432,12 +432,14 @@ export default function App() {
 
         {/* ===================== 左ブックマークタブ ===================== */}
 <div style={{
+  position: 'fixed',
+  top: '57px',
+  left: sidebarOpen ? '220px' : '0px',
   display: 'flex', flexDirection: 'column',
   alignItems: 'flex-start',
-  paddingTop: '20px', gap: '4px',
-  flexShrink: 0, zIndex: 50,
-  width: '40px',
-  // 背景なし！
+  paddingTop: '20px',
+  zIndex: 50,
+  transition: 'left 0.3s ease',
 }}>
   <div
     onClick={() => setSidebarOpen(p => !p)}
@@ -462,8 +464,11 @@ export default function App() {
 </div>
         {/* ===================== スライドパネル ===================== */}
         <div style={{
-          position: 'absolute', top: 0, left: '27px',
-          height: '100%', width: sidebarOpen ? '220px' : '0px',
+          position: 'fixed',
+          top: '57px',
+          left: 0,
+          height: '100vh',
+          width: sidebarOpen ? '220px' : '0px',
           background: theme.surface,
           borderRight: sidebarOpen ? `1px solid ${theme.border}` : 'none',
           overflow: 'hidden',
@@ -584,11 +589,11 @@ export default function App() {
 
           {/* ページコンテンツ */}
           {currentPage === 'dashboard' && (
-            <div style={{ padding: '24px' }}>
+            <div style={{ padding: '32px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
                 {panels.map(panel => (
                   <div key={panel.id} style={{
-                    background: theme.surface, border: `1px solid ${theme.border}`,
+                    background: theme.surface, border: 'none',
                     borderRadius: '12px', padding: '16px',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
