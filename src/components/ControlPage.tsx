@@ -62,8 +62,8 @@ const SEQUENCE = [
 
 const CYCLE_COUNT = 8
 
-function buildActions(): RobotAction[] {
-  return SEQUENCE.map((s, i) => ({
+function buildActions(fromIndex: number = 0): RobotAction[] {
+  return SEQUENCE.slice(fromIndex).map((s, i) => ({
     id: i, name: s.name, detail: s.detail,
     status: i === 0 ? 'active' as ActionStatus : 'waiting' as ActionStatus,
     startTime: i === 0 ? (() => { const n = new Date(); return `${n.getHours()}:${String(n.getMinutes()).padStart(2,'0')}:${String(n.getSeconds()).padStart(2,'0')}` })() : '—',
@@ -124,17 +124,19 @@ export default function ControlPage({ theme }: Props) {
             pausedRef.current = false
 
             if (nextIndex >= prev.length) {
-              setCycleIndex(c => {
-                const nextCycle = c + 1
-                if (nextCycle >= CYCLE_COUNT) {
-                  startTimeRef.current = new Date()
-                  setTotalSeconds(0)
-                  setTimeout(() => { setCycleIndex(0); setActions(buildActions()) }, 300)
-                } else {
-                  setTimeout(() => { setActions(buildActions()) }, 300)
-                }
-                return nextCycle
-              })
+             setCycleIndex(c => {
+              const nextCycle = c + 1
+              if (nextCycle >= CYCLE_COUNT) {
+              // 全サイクル完了 → 完全リセット
+              startTimeRef.current = new Date()
+              setTotalSeconds(0)
+              setTimeout(() => { setCycleIndex(0); setActions(buildActions(0)) }, 300)
+            } else {
+             // 2回目以降は移動→上刃取出からスタート
+             setTimeout(() => { setActions(buildActions(2)) }, 300)
+            }
+            return nextCycle
+            })
             } else {
               setActions(prev2 => prev2.map((a, i) => {
                 if (i === activeIndex) return { ...a, status: 'done' as ActionStatus, progress: undefined, endTime: timeStr }
@@ -248,7 +250,12 @@ export default function ControlPage({ theme }: Props) {
           <span style={{ color: theme.text, fontWeight: 'bold' }}>{actions.length}</span>
           <span style={{ color: theme.subtext, fontSize: '11px', marginLeft: '4px' }}>完了</span>
         </div>
-        
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: `${theme.accent}22`, border: `1px solid ${theme.accent}66`, borderRadius: '999px', padding: '4px 14px', fontSize: '13px' }}>
+          <span style={{ color: theme.subtext, fontSize: '11px' }}>サイクル</span>
+          <span style={{ color: theme.accent, fontWeight: 'bold' }}>{Math.min(cycleIndex + 1, CYCLE_COUNT)}</span>
+          <span style={{ color: theme.subtext }}>/</span>
+          <span style={{ color: theme.text, fontWeight: 'bold' }}>{CYCLE_COUNT}</span>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: `${theme.accent}22`, border: `1px solid ${theme.accent}66`, borderRadius: '999px', padding: '4px 14px', fontSize: '13px' }}>
           <span style={{ color: theme.subtext, fontSize: '11px' }}>総経過時間</span>
           <span style={{ color: theme.accent, fontWeight: 'bold', fontFamily: 'monospace' }}>{formatTime(totalSeconds)}</span>
