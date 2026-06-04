@@ -14,8 +14,8 @@ export const THEMES: Record<ThemeKey, Theme> = {
 }
 
 export const PAGES = [
-  { key: 'dashboard' as const, label: '運転モニタ', short: '画面' },
-  { key: 'control' as const,   label: '制御フロー', short: '制御' },
+  { key: 'dashboard' as const, label: 'MONITOR', short: '画面' },
+  { key: 'control' as const,   label: 'FLOW', short: '制御' },
 ]
 
 export const GRAPH_DEFINITIONS = [
