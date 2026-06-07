@@ -124,20 +124,22 @@ export default function ControlPage({ theme }: Props) {
             pausedRef.current = false
 
             if (nextIndex >= prev.length) {
-             setCycleIndex(c => {
-              const nextCycle = c + 1
-              if (nextCycle >= CYCLE_COUNT) {
-              // 全サイクル完了 → 完全リセット
-              startTimeRef.current = new Date()
-              setTotalSeconds(0)
-              setTimeout(() => { setCycleIndex(0); setActions(buildActions(0)) }, 300)
-            } else {
-             // 2回目以降は移動→上刃取出からスタート
-             setTimeout(() => { setActions(buildActions(2)) }, 300)
-            }
-            return nextCycle
+              setCycleIndex(c => {
+                const nextCycle = c + 1
+                if (nextCycle >= CYCLE_COUNT) {
+                   startTimeRef.current = new Date()
+                   setTotalSeconds(0)
+                   setTimeout(() => {
+                   setCycleIndex(0)
+                   setActions(buildActions(0))
+                }, 300)
+                return 0 // ← リセット
+              } else {
+                setTimeout(() => { setActions(buildActions(2)) }, 300)
+                return nextCycle // ← 1つだけ増やす
+              }
             })
-            } else {
+          } else {
               setActions(prev2 => prev2.map((a, i) => {
                 if (i === activeIndex) return { ...a, status: 'done' as ActionStatus, progress: undefined, endTime: timeStr }
                 if (i === nextIndex) return { ...a, status: 'active' as ActionStatus, startTime: timeStr, progress: 0 }
