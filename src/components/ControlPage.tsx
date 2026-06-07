@@ -28,7 +28,6 @@ function ActionIcon({ name, theme, active, size = 56 }: { name: string; theme: T
   )
 }
 
-// スピナー
 function Spinner({ color }: { color: string }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '4px 0' }}>
@@ -38,7 +37,6 @@ function Spinner({ color }: { color: string }) {
         borderTop: `3px solid ${color}`,
         animation: 'spin 0.7s linear infinite',
       }} />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
@@ -63,10 +61,12 @@ const SEQUENCE = [
 const CYCLE_COUNT = 8
 
 function buildActions(fromIndex: number = 0): RobotAction[] {
+  const now = new Date()
+  const timeStr = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
   return SEQUENCE.slice(fromIndex).map((s, i) => ({
     id: i, name: s.name, detail: s.detail,
     status: i === 0 ? 'active' as ActionStatus : 'waiting' as ActionStatus,
-    startTime: i === 0 ? (() => { const n = new Date(); return `${n.getHours()}:${String(n.getMinutes()).padStart(2,'0')}:${String(n.getSeconds()).padStart(2,'0')}` })() : '—',
+    startTime: i === 0 ? timeStr : '—',
     endTime: undefined,
     progress: i === 0 ? 0 : undefined,
   }))
@@ -75,12 +75,18 @@ function buildActions(fromIndex: number = 0): RobotAction[] {
 type Props = { theme: Theme }
 
 export default function ControlPage({ theme }: Props) {
-  const [cycleIndex, setCycleIndex] = useState(0)
-  const [actions, setActions] = useState<RobotAction[]>(buildActions())
-  const [spinning, setSpinning] = useState(false) // クルクル表示中
-  const [totalSeconds, setTotalSeconds] = useState(0)
+  // 全状態をRefで一元管理（setIntervalのクロージャ問題を回避）
+  const actionsRef = useRef<RobotAction[]>(buildActions(0))
+  const cycleRef = useRef(0)
+  const pausedRef = useRef(false)
+  const spinUntilRef = useRef(0) // スピナー終了時刻(ms)
   const startTimeRef = useRef<Date>(new Date())
-  const pausedRef = useRef(false) // クルクル中は進行停止
+
+  // 表示用State（これだけsetStateする）
+  const [actions, setActions] = useState<RobotAction[]>(actionsRef.current)
+  const [cycleIndex, setCycleIndex] = useState(0)
+  const [spinning, setSpinning] = useState(false)
+  const [totalSeconds, setTotalSeconds] = useState(0)
 
   // トータル時間
   useEffect(() => {
@@ -94,95 +100,103 @@ export default function ControlPage({ theme }: Props) {
     const h = Math.floor(sec / 3600)
     const m = Math.floor((sec % 3600) / 60)
     const s = sec % 60
-    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
   }
 
-  // シーケンス進行
+  // メインループ
   useEffect(() => {
     const id = setInterval(() => {
-      if (pausedRef.current) return
+      const now = Date.now()
 
-      setActions(prev => {
+      // スピナー中
+      if (spinUntilRef.current > now) {
+        setSpinning(true)
+        return
+      }
+
+      // スピナー終了直後
+      if (spinUntilRef.current > 0) {
+        spinUntilRef.current = 0
+        setSpinning(false)
+
+        const prev = actionsRef.current
         const activeIndex = prev.findIndex(a => a.status === 'active')
-        if (activeIndex === -1) return prev
-        const active = prev[activeIndex]
-        if (active.progress === undefined) return prev
+        const nextIndex = activeIndex + 1
+        const nowDate = new Date()
+        const timeStr = `${nowDate.getHours()}:${String(nowDate.getMinutes()).padStart(2, '0')}:${String(nowDate.getSeconds()).padStart(2, '0')}`
 
-        const next = Math.min(active.progress + 4, 100)
-
-        if (next >= 100) {
-          const now = new Date()
-          const timeStr = `${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`
-          const nextIndex = activeIndex + 1
-
-          // クルクルを表示してからの切り替え
-          pausedRef.current = true
-          const lag = Math.floor(Math.random() * 1500) + 500 // 500〜2000msランダム
-          setSpinning(true)
-          setTimeout(() => {
-            setSpinning(false)
-            pausedRef.current = false
-
-            if (nextIndex >= prev.length) {
-              setCycleIndex(c => {
-                const nextCycle = c + 1
-                if (nextCycle >= CYCLE_COUNT) {
-                   startTimeRef.current = new Date()
-                   setTotalSeconds(0)
-                   setTimeout(() => {
-                   setCycleIndex(0)
-                   setActions(buildActions(0))
-                }, 300)
-                return 0 // ← リセット
-              } else {
-                setTimeout(() => { setActions(buildActions(2)) }, 300)
-                return nextCycle // ← 1つだけ増やす
-              }
-            })
+        if (nextIndex >= prev.length) {
+          // サイクル終了
+          const nextCycle = cycleRef.current + 1
+          if (nextCycle >= CYCLE_COUNT) {
+            cycleRef.current = 0
+            setCycleIndex(0)
+            startTimeRef.current = new Date()
+            setTotalSeconds(0)
+            actionsRef.current = buildActions(0)
           } else {
-              setActions(prev2 => prev2.map((a, i) => {
-                if (i === activeIndex) return { ...a, status: 'done' as ActionStatus, progress: undefined, endTime: timeStr }
-                if (i === nextIndex) return { ...a, status: 'active' as ActionStatus, startTime: timeStr, progress: 0 }
-                return a
-              }))
-            }
-          }, lag)
-
-          return prev.map((a, i) =>
-            i === activeIndex ? { ...a, progress: 100 } : a
-          )
+            cycleRef.current = nextCycle
+            setCycleIndex(nextCycle)
+            actionsRef.current = buildActions(2)
+          }
+        } else {
+          actionsRef.current = prev.map((a, i) => {
+            if (i === activeIndex) return { ...a, status: 'done' as ActionStatus, progress: undefined, endTime: timeStr }
+            if (i === nextIndex) return { ...a, status: 'active' as ActionStatus, startTime: timeStr, progress: 0 }
+            return a
+          })
         }
+        setActions([...actionsRef.current])
+        return
+      }
 
-        return prev.map((a, i) =>
-          i === activeIndex ? { ...a, progress: next } : a
+      // 通常進行
+      const prev = actionsRef.current
+      const activeIndex = prev.findIndex(a => a.status === 'active')
+      if (activeIndex === -1) return
+
+      const active = prev[activeIndex]
+      if (active.progress === undefined) return
+
+      const nextProgress = Math.min(active.progress + 4, 100)
+
+      if (nextProgress >= 100) {
+        // スピナー開始
+        const lag = Math.floor(Math.random() * 1500) + 500
+        spinUntilRef.current = Date.now() + lag
+        setSpinning(true)
+        actionsRef.current = prev.map((a, i) =>
+          i === activeIndex ? { ...a, progress: 100 } : a
         )
-      })
+      } else {
+        actionsRef.current = prev.map((a, i) =>
+          i === activeIndex ? { ...a, progress: nextProgress } : a
+        )
+      }
+      setActions([...actionsRef.current])
     }, 150)
+
     return () => clearInterval(id)
   }, [])
 
   const activeIndex = actions.findIndex(a => a.status === 'active')
-
-  // 常に真ん中固定：前1・現在・後1 + 先頭/末尾はnullで埋める
   const prevAction = activeIndex > 0 ? actions[activeIndex - 1] : null
   const currAction = actions[activeIndex] ?? null
   const nextAction = activeIndex < actions.length - 1 ? actions[activeIndex + 1] : null
   const displaySlots: (RobotAction | null)[] = [prevAction, currAction, nextAction]
-
   const doneCount = actions.filter(a => a.status === 'done').length
 
   const renderCard = (action: RobotAction | null, position: 'prev' | 'curr' | 'next') => {
     const isActive = position === 'curr'
-    const isEmpty = action === null
 
-    if (isEmpty) {
+    if (action === null) {
       return (
         <div style={{
           border: `1px dashed ${theme.border}`,
           borderRadius: '16px',
           padding: '32px',
           opacity: 0.15,
-          minHeight: isActive ? '160px' : '100px',
+          minHeight: '100px',
         }} />
       )
     }
@@ -200,7 +214,6 @@ export default function ControlPage({ theme }: Props) {
         boxShadow: isActive ? `0 0 24px ${theme.accent}44` : 'none',
         transition: 'all 0.3s',
       }}>
-        {/* インジケーター */}
         <div style={{
           width: isActive ? '12px' : '9px',
           height: isActive ? '12px' : '9px',
@@ -240,8 +253,6 @@ export default function ControlPage({ theme }: Props) {
 
   return (
     <div style={{ padding: '35px 40px', color: theme.text, maxWidth: '1200px', margin: '0 auto' }}>
-
-      {/* ヘッダー */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '40px', flexWrap: 'wrap' }}>
         <h2 style={{ fontSize: '16px', color: theme.subtext, margin: 0, fontWeight: 'normal', letterSpacing: '0.1em' }}>
           ロボット動作シーケンス
@@ -254,7 +265,7 @@ export default function ControlPage({ theme }: Props) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: `${theme.accent}22`, border: `1px solid ${theme.accent}66`, borderRadius: '999px', padding: '4px 14px', fontSize: '13px' }}>
           <span style={{ color: theme.subtext, fontSize: '11px' }}>サイクル</span>
-          <span style={{ color: theme.accent, fontWeight: 'bold' }}>{Math.min(cycleIndex + 1, CYCLE_COUNT)}</span>
+          <span style={{ color: theme.accent, fontWeight: 'bold' }}>{cycleIndex + 1}</span>
           <span style={{ color: theme.subtext }}>/</span>
           <span style={{ color: theme.text, fontWeight: 'bold' }}>{CYCLE_COUNT}</span>
         </div>
@@ -264,13 +275,11 @@ export default function ControlPage({ theme }: Props) {
         </div>
       </div>
 
-      {/* カード3枚 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0px' }}>
         {displaySlots.map((action, i) => {
           const position = i === 0 ? 'prev' : i === 1 ? 'curr' : 'next'
           return (
             <div key={i}>
-              {/* 接続部分 */}
               {i > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '36px' }}>
                   {spinning && position === 'curr' ? (
