@@ -1,0 +1,136 @@
+import { useEffect, useRef, useState, useCallback } from 'react'
+import type { DataPoint } from '../types'
+import {
+  isPlcData,
+  formatPlcTime,
+  addressToDataKey,
+  getDoubleWordValue,
+  PLC_DOUBLE_WORD_COUNT,
+  PLC_RAW_WORD_COUNT,
+} from '../plc'
+
+export type WsStatus = 'idle' | 'connecting' | 'open' | 'closed' | 'error'
+
+const MAX_BUFFER = 50
+
+type Options = {
+  enabled: boolean
+  isPlaying: boolean
+  intervalSec: number
+  selectedAddresses: number[]
+}
+
+function buildWsUrl(): string | null {
+  const base = import.meta.env.VITE_WS_BASE_URL as string | undefined
+  const token = import.meta.env.VITE_WS_TOKEN as string | undefined
+  if (!base?.trim() || !token?.trim()) return null
+  const normalized = base.replace(/\/$/, '')
+  const path = normalized.endsWith('/browser') ? normalized : `${normalized}/browser`
+  return `${path}?token=${encodeURIComponent(token)}`
+}
+
+export function usePlcWebSocket({
+  enabled,
+  isPlaying,
+  intervalSec,
+  selectedAddresses,
+}: Options) {
+  const [status, setStatus] = useState<WsStatus>('idle')
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [data, setData] = useState<DataPoint[]>([])
+  const [browserCount, setBrowserCount] = useState<number | null>(null)
+  const lastAppendRef = useRef(0)
+  const wsRef = useRef<WebSocket | null>(null)
+  const addressesRef = useRef(selectedAddresses)
+  const isPlayingRef = useRef(isPlaying)
+
+  useEffect(() => {
+    addressesRef.current = selectedAddresses
+  }, [selectedAddresses])
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying
+  }, [isPlaying])
+
+  const appendPoint = useCallback((values: number[], ts: number, addresses: number[]) => {
+    const time = formatPlcTime(ts)
+    const point: DataPoint = { time, _ts: ts }
+    for (const addr of addresses) {
+      const dwValue = getDoubleWordValue(values, addr)
+      if (dwValue !== null) {
+        point[addressToDataKey(addr)] = dwValue
+      }
+    }
+    setData((prev) => {
+      const updated = [...prev, point]
+      return updated.length > MAX_BUFFER ? updated.slice(-MAX_BUFFER) : updated
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!enabled) return
+
+    const url = buildWsUrl()
+    if (!url) {
+      setStatus('error')
+      setErrorMessage('VITE_WS_BASE_URL と VITE_WS_TOKEN を .env に設定してください')
+      return
+    }
+
+    setStatus('connecting')
+    setErrorMessage(null)
+
+    const ws = new WebSocket(url)
+    wsRef.current = ws
+
+    ws.onopen = () => setStatus('open')
+    ws.onclose = () => setStatus('closed')
+    ws.onerror = () => {
+      setStatus('error')
+      setErrorMessage('WebSocket 接続エラー')
+    }
+
+    ws.onmessage = (event) => {
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(event.data as string)
+      } catch {
+        return
+      }
+
+      if (
+        typeof parsed === 'object' &&
+        parsed !== null &&
+        (parsed as { type?: string }).type === 'browserCount'
+      ) {
+        const count = (parsed as { count?: number }).count
+        if (typeof count === 'number') setBrowserCount(count)
+        return
+      }
+
+      if (!isPlcData(parsed)) return
+      if (!isPlayingRef.current) return
+
+      const now = Date.now()
+      const intervalMs = Math.max(intervalSec * 1000, 50)
+      if (now - lastAppendRef.current < intervalMs) return
+      lastAppendRef.current = now
+
+      const len = parsed.values.length
+      if (len !== PLC_DOUBLE_WORD_COUNT && len < PLC_RAW_WORD_COUNT) {
+        console.warn(
+          `PLC values length: ${len} (expected ${PLC_DOUBLE_WORD_COUNT} precombined or ${PLC_RAW_WORD_COUNT} raw words)`,
+        )
+      }
+
+      appendPoint(parsed.values, parsed.ts, addressesRef.current)
+    }
+
+    return () => {
+      ws.close()
+      wsRef.current = null
+    }
+  }, [enabled, intervalSec, appendPoint])
+
+  return { status, errorMessage, data, browserCount }
+}

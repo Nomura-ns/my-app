@@ -14,17 +14,6 @@ export const THEMES: Record<ThemeKey, Theme> = {
 }
 
 export const PAGES = [
-  { key: 'dashboard' as const, label: 'MONITOR', short: '画面' },
-  { key: 'control' as const,   label: 'FLOW', short: '制御' },
-]
-
-export const GRAPH_DEFINITIONS = [
-  { key: 'A', label: '値A', stroke: '#0af3e0' },
-  { key: 'B', label: '値B', stroke: '#43d0f3' },
-  { key: 'C', label: '値C', stroke: '#f472b6' },
-  { key: 'D', label: '値D', stroke: '#fb923c' },
-  { key: 'E', label: '値E', stroke: '#34d399' },
-  { key: 'F', label: '値F', stroke: '#60a5fa' },
-  { key: 'G', label: '値G', stroke: '#f87171' },
-  { key: 'H', label: '値H', stroke: '#a78bfa' },
+  { key: 'dashboard' as const, label: '運転モニタ' },
+  { key: 'control' as const, label: '制御フロー' },
 ]

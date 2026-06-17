@@ -8,7 +8,7 @@ import ControlPage from './components/ControlPage'
 
 export default function App() {
   const [range, setRange] = useState(20)
-  const [intervalSec, setIntervalSec] = useState(1)
+  const [intervalSec, setIntervalSec] = useState(0.1)
   const [showSettings, setShowSettings] = useState(false)
   const [isPlaying, setIsPlaying] = useState(true)
   const [themeKey, setThemeKey] = useState<ThemeKey>('dark-blue')
@@ -18,21 +18,19 @@ export default function App() {
   const theme = THEMES[themeKey]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: theme.bg, color: theme.text, transition: 'all 0.3s' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: theme.bg, color: theme.text, transition: 'background-color 0.3s, color 0.3s' }}>
 
       {/* ヘッダー */}
-      <header style={{
-        width: '100%',
-        background: theme.headerBg,
-        borderBottom: `1px solid ${theme.border}`,
-        display: 'flex', alignItems: 'center',
-        justifyContent: 'space-between', padding: '8px 24px',
-        position: 'sticky', top: 0, zIndex: 50,
-        boxSizing: 'border-box',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <header
+        className="app-header"
+        style={{
+          background: theme.headerBg,
+          borderBottom: `1px solid ${theme.border}`,
+        }}
+      >
+        <div className="app-header__brand">
           <img src={theme.logo} alt="logo" className="logo" />
-          <span style={{ fontSize: '13px', color: theme.subtext }}>
+          <span className="app-header__title" style={{ color: theme.subtext }}>
             {PAGES.find(p => p.key === currentPage)?.label}
           </span>
         </div>
@@ -81,7 +79,6 @@ export default function App() {
             isPlaying={isPlaying}
             intervalSec={intervalSec}
             range={range}
-            sidebarOpen={sidebarOpen}
           />
         )}
 

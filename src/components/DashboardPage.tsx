@@ -1,92 +1,326 @@
-import { useState, useEffect } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Brush } from 'recharts'
-import type { Theme, DataPoint, PanelConfig } from '../types'
-import { GRAPH_DEFINITIONS } from '../themes'
-import GraphSelector from './GraphSelector'
+import { useState, useMemo } from 'react'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Brush,
+} from 'recharts'
+import type { AxisRange, Theme, DataPoint, PanelConfig, XAxisKey } from '../types'
+import { getStrokeColor } from '../plc'
+import {
+  collectRequiredAddresses,
+  countPlottablePoints,
+  getChartSeries,
+  isValidPanel,
+  migrateLegacyPanel,
+  normalizeAddresses,
+  normalizePanel,
+  resolveDomain,
+} from '../chartAxis'
+import { usePlcWebSocket } from '../hooks/usePlcWebSocket'
+import { useIsMobile } from '../hooks/useMediaQuery'
+import PanelAxisControls from './PanelAxisControls'
+import ChartAxisFrame, { getChartFrameHeight } from './ChartAxisFrame'
+import { getLineChartMargin, type LayoutSize } from '../axisControlStyles'
 
-// =============================================
-// 運転モニタページ
-// =============================================
+const DEFAULT_PANELS: PanelConfig[] = [
+  { id: 1, xAxis: 15004, yAddresses: [15000, 15002] },
+  { id: 2, xAxis: 'time', yAddresses: [15000, 15002] },
+  { id: 3, xAxis: 'time', yAddresses: [15000] },
+  { id: 4, xAxis: 15004, yAddresses: [15002] },
+]
+
+const PANELS_STORAGE_KEY = 'plc-dashboard-panels'
+
+function loadPanels(): PanelConfig[] {
+  try {
+    const raw = localStorage.getItem(PANELS_STORAGE_KEY)
+    if (!raw) return DEFAULT_PANELS
+    const parsed = JSON.parse(raw) as Record<string, unknown>[]
+    if (!Array.isArray(parsed) || parsed.length !== 4) return DEFAULT_PANELS
+    return parsed.map((p, i) =>
+      migrateLegacyPanel({ ...p, id: (p.id as number) ?? i + 1 }, (p.id as number) ?? i + 1),
+    )
+  } catch {
+    return DEFAULT_PANELS
+  }
+}
 
 type Props = {
   theme: Theme
   isPlaying: boolean
   intervalSec: number
   range: number
-  sidebarOpen: boolean
 }
 
-export default function DashboardPage({ theme, isPlaying, intervalSec, range, sidebarOpen }: Props) {
-  const [data, setData] = useState<DataPoint[]>([])
-  const [panels, setPanels] = useState<PanelConfig[]>([
-    { id: 1, selectedKeys: ['A', 'B'] },
-    { id: 2, selectedKeys: ['C', 'D'] },
-    { id: 3, selectedKeys: ['E', 'F'] },
-    { id: 4, selectedKeys: ['G', 'H'] },
-  ])
+const STATUS_LABEL: Record<string, string> = {
+  idle: '未接続',
+  connecting: '接続中…',
+  open: 'PLC 受信中',
+  closed: '切断',
+  error: 'エラー',
+}
 
-  useEffect(() => {
-    if (!isPlaying) return
-    const id = setInterval(() => {
-      const now = new Date()
-      const time = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
-      setData(prev => {
-        const newPoint: DataPoint = { time }
-        GRAPH_DEFINITIONS.forEach(g => { newPoint[g.key] = Math.floor(Math.random() * 100) })
-        const updated = [...prev, newPoint]
-        return updated.length > 50 ? updated.slice(-50) : updated
-      })
-    }, intervalSec * 1000)
-    return () => clearInterval(id)
-  }, [intervalSec, isPlaying])
+function NoDataHint({ theme, message }: { theme: Theme; message: string }) {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+        textAlign: 'center',
+        fontSize: '12px',
+        color: theme.subtext,
+        pointerEvents: 'none',
+      }}
+    >
+      {message}
+    </div>
+  )
+}
+
+function PanelChart({
+  panel,
+  displayData,
+  theme,
+  isPlaying,
+  layoutSize,
+  onYRangeChange,
+  onXRangeChange,
+}: {
+  panel: PanelConfig
+  displayData: DataPoint[]
+  theme: Theme
+  isPlaying: boolean
+  layoutSize: LayoutSize
+  onYRangeChange: (range: AxisRange | undefined) => void
+  onXRangeChange: (range: AxisRange | undefined) => void
+}) {
+  const normalized = normalizePanel(panel)
+  const isTimeMode = normalized.xAxis === 'time'
+  const showXRange = !isTimeMode
+
+  if (!isValidPanel(normalized)) {
+    return (
+      <div
+        style={{
+          height: getChartFrameHeight(layoutSize),
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: theme.subtext,
+          fontSize: '13px',
+        }}
+      >
+        X軸・Y軸の組み合わせが不正です
+      </div>
+    )
+  }
+
+  const series = getChartSeries(normalized)
+  const yKeys = series.map((s) => s.yKey)
+  const xKey = series[0]?.xKey
+  const plottableKeys = isTimeMode ? yKeys : xKey ? [xKey, ...yKeys] : yKeys
+  const plottable = countPlottablePoints(displayData, plottableKeys)
+  const yDomain = resolveDomain(displayData, yKeys, normalized.yRange)
+  const xDomain = xKey ? resolveDomain(displayData, [xKey], normalized.xRange) : ['auto', 'auto']
+  const withBrush = isTimeMode && !isPlaying
+  const chartMargin = getLineChartMargin(showXRange, withBrush, layoutSize)
+
+  const chartEl = (
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart data={displayData} margin={chartMargin}>
+        <CartesianGrid strokeDasharray="3 3" stroke={theme.border} />
+        {isTimeMode ? (
+          <XAxis dataKey="time" tick={{ fontSize: 10, fill: theme.subtext }} />
+        ) : (
+          <XAxis
+            dataKey={xKey}
+            type="number"
+            tick={{ fontSize: 10, fill: theme.subtext }}
+            domain={xDomain}
+          />
+        )}
+        <YAxis tick={{ fontSize: 10, fill: theme.subtext }} domain={yDomain} />
+        <Tooltip
+          contentStyle={{
+            background: theme.surface,
+            border: `1px solid ${theme.border}`,
+            color: theme.text,
+          }}
+        />
+        {series.map((s) => (
+          <Line
+            key={s.yKey}
+            type="monotone"
+            dataKey={s.yKey}
+            name={s.label}
+            stroke={getStrokeColor(s.yAddr)}
+            strokeWidth={2}
+            dot={false}
+            isAnimationActive={false}
+            connectNulls
+          />
+        ))}
+        {isTimeMode && !isPlaying && (
+          <Brush dataKey="time" height={20} stroke={theme.accent} fill={theme.surface} />
+        )}
+      </LineChart>
+    </ResponsiveContainer>
+  )
+
+  return (
+    <ChartAxisFrame
+      theme={theme}
+      showXRange={showXRange}
+      chartMargin={chartMargin}
+      layoutSize={layoutSize}
+      yRange={normalized.yRange}
+      xRange={normalized.xRange}
+      onYRangeChange={onYRangeChange}
+      onXRangeChange={onXRangeChange}
+      noDataOverlay={
+        plottable === 0 && yKeys.length > 0 ? (
+          <NoDataHint
+            theme={theme}
+            message={`${yKeys.join(', ')} のデータがまだありません。新しい受信データが溜まると表示されます。`}
+          />
+        ) : undefined
+      }
+    >
+      {chartEl}
+    </ChartAxisFrame>
+  )
+}
+
+export default function DashboardPage({ theme, isPlaying, intervalSec, range }: Props) {
+  const [panels, setPanels] = useState<PanelConfig[]>(loadPanels)
+  const isMobile = false
+  const layoutSize: LayoutSize = 'desktop'
+
+  const allSelectedAddresses = useMemo(
+    () => collectRequiredAddresses(panels),
+    [panels],
+  )
+
+  const { status, errorMessage, data, browserCount } = usePlcWebSocket({
+    enabled: false,//一時的？
+    isPlaying,
+    intervalSec,
+    selectedAddresses: allSelectedAddresses,
+  })
 
   const displayData = data.slice(-range)
 
-  const handlePanelChange = (panelId: number, keys: string[]) => {
-    setPanels(prev => prev.map(p => p.id === panelId ? { ...p, selectedKeys: keys } : p))
+  const savePanels = (next: PanelConfig[]) => {
+    localStorage.setItem(PANELS_STORAGE_KEY, JSON.stringify(next.map(normalizePanel)))
+    return next.map(normalizePanel)
   }
 
+  const updatePanel = (panelId: number, patch: Partial<PanelConfig>) => {
+    setPanels((prev) =>
+      savePanels(prev.map((p) => (p.id === panelId ? normalizePanel({ ...p, ...patch }) : p))),
+    )
+  }
+
+  const handleXAxisChange = (panelId: number, xAxis: XAxisKey) => {
+    setPanels((prev) =>
+      savePanels(
+        prev.map((p) => {
+          if (p.id !== panelId) return p
+          if (xAxis === 'time') {
+            return normalizePanel({ ...p, xAxis: 'time', xRange: undefined })
+          }
+          return normalizePanel({ ...p, xAxis })
+        }),
+      ),
+    )
+  }
+
+  const statusColor =
+    status === 'open' ? '#34d399' : status === 'error' ? '#f87171' : theme.subtext
+
   return (
-  <div style={{
-    padding: '35px',
-    boxSizing: 'border-box',
-    width: '100%',
-  }}>
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-        {panels.map(panel => (
-          <div key={panel.id} style={{
-            background: theme.surface, border: `1px solid ${theme.border}`,
-            borderRadius: '12px', padding: '16px',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 'bold', color: theme.text }}>パネル{panel.id}</span>
-              <GraphSelector
+    <div className="dashboard-page">
+      <div
+        className="status-bar"
+        style={{
+          background: theme.surface,
+          border: `1px solid ${theme.border}`,
+          color: theme.text,
+        }}
+      >
+        <span
+          style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            background: statusColor,
+            boxShadow: status === 'open' ? `0 0 8px ${statusColor}` : 'none',
+          }}
+        />
+        <span style={{ color: theme.text }}>
+          {STATUS_LABEL[status] ?? status}
+          {errorMessage && (
+            <span style={{ color: '#f87171', marginLeft: '8px' }}>— {errorMessage}</span>
+          )}
+        </span>
+        {browserCount !== null && (
+          <span className="status-bar__meta" style={{ color: theme.subtext }}>
+            ブラウザ接続: {browserCount} 台
+          </span>
+        )}
+        {!isPlaying && (
+          <span style={{ color: theme.subtext }}>停止中 — 新規データは追記されません</span>
+        )}
+        {data.length > 0 && (
+          <span style={{ color: theme.subtext }}>データ点数: {data.length}</span>
+        )}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '24px', width: '100%' }}>
+        {panels.map((panel) => {
+          const normalized = normalizePanel(panel)
+          return (
+            <div
+              key={panel.id}
+              className="panel-card"
+              style={{
+                background: theme.surface,
+                border: `1px solid ${theme.border}`,
+              }}
+            >
+              <PanelAxisControls
                 panelId={panel.id}
-                selectedKeys={panel.selectedKeys}
-                onChange={handlePanelChange}
+                xAxis={normalized.xAxis}
+                yAddresses={normalized.yAddresses}
+                onXAxisChange={(v) => handleXAxisChange(panel.id, v)}
+                onYAddressesChange={(addrs) =>
+                  updatePanel(panel.id, { yAddresses: normalizeAddresses(addrs) })
+                }
                 theme={theme}
+                layoutSize={layoutSize}
+              />
+
+              <PanelChart
+                panel={normalized}
+                displayData={displayData}
+                theme={theme}
+                isPlaying={isPlaying}
+                layoutSize={layoutSize}
+                onYRangeChange={(yRange) => updatePanel(panel.id, { yRange })}
+                onXRangeChange={(xRange) => updatePanel(panel.id, { xRange })}
               />
             </div>
-            <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={displayData}>
-                <CartesianGrid strokeDasharray="3 3" stroke={theme.border} />
-                <XAxis dataKey="time" tick={{ fontSize: 10, fill: theme.subtext }} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: theme.subtext }} />
-                <Tooltip contentStyle={{ background: theme.surface, border: `1px solid ${theme.border}`, color: theme.text }} />
-                <Legend wrapperStyle={{ fontSize: '12px', color: theme.text }} />
-                {panel.selectedKeys.map(key => {
-                  const def = GRAPH_DEFINITIONS.find(g => g.key === key)
-                  if (!def) return null
-                  return (
-                    <Line key={key} type="monotone" dataKey={key} name={def.label}
-                      stroke={def.stroke} strokeWidth={2} dot={false} isAnimationActive={false} />
-                  )
-                })}
-                {!isPlaying && <Brush dataKey="time" height={24} stroke={theme.accent} fill={theme.surface} />}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
