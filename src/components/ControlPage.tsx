@@ -78,7 +78,7 @@ function ImagePlaceholder({ height, theme }: { height: number; theme: Theme }) {
         background: '#ffffff',
         borderRadius: '8px',
         padding: '8px',
-        height: `${Math.floor(height * 0.82)}px`,
+        height: `${Math.floor(height * 0.75)}px`,
         width: '80%',
         display: 'flex',
         alignItems: 'center',
@@ -102,7 +102,7 @@ function DownBladeSimulation({ theme, activeSubIndex, height }: {
 }) {
   const images = [
     { src: '/下刃へ移動.png', label: '下刃へ移動' },
-    { src: '/下刃溝作成.png', label: '下刃溝作成' },
+    { src: '/下刃溝作成.png', label: '下刃溝撮影' },
     { src: '/上刃ストックへ移動.png', label: '上刃ストックへ移動' },
   ]
   const currentIndex = Math.min(activeSubIndex, images.length - 1)
@@ -160,7 +160,7 @@ function ActionSimulation({ name, theme, activeSubIndex, height }: {
 function StepCard({ step, theme, isActive, isPrev, activeCardHeight }: {
   step: MainStep; theme: Theme; isActive: boolean; isPrev: boolean; activeCardHeight: number
 }) {
-  const simHeight = Math.floor(activeCardHeight * 0.68)
+  const simHeight = Math.floor(activeCardHeight * 0.60)
 
   return (
     <div style={{
@@ -246,7 +246,7 @@ function StepCard({ step, theme, isActive, isPrev, activeCardHeight }: {
 
       {/* シミュレーション（現在のみ） */}
       {isActive && (
-        <div style={{ flex: 1, minHeight: 0 }}>
+        <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
           <ActionSimulation
             name={step.name}
             theme={theme}

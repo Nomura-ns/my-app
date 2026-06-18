@@ -156,41 +156,48 @@ export default function Sidebar({ theme, currentPage, sidebarOpen, onPageChange,
             ページ切り替え
           </p>
           {PAGES.map(page => (
-            <div key={page.key} style={{ marginBottom: '12px' }}>
-              {/* ページ名（クリック不要、表示のみ） */}
-              <div style={{
-                padding: '4px 8px', fontSize: '12px',
-                color: currentPage === page.key ? theme.accent : theme.text,
-                fontWeight: currentPage === page.key ? 'bold' : 'normal',
-                display: 'flex', alignItems: 'center', gap: '6px',
-              }}>
-                 <span style={{
-                   width: '6px', height: '6px', borderRadius: '50%',
-                   background: currentPage === page.key ? theme.accent : theme.subtext,
-                   flexShrink: 0,
-               }} />
-               {page.label}
-             </div>
+  <div
+    key={page.key}
+    onClick={() => { onPageChange(page.key); onClose() }}
+    style={{
+      marginBottom: '12px',
+      cursor: 'pointer',
+      borderRadius: '8px',
+      border: `1px solid ${currentPage === page.key ? theme.accent : 'transparent'}`,
+      background: currentPage === page.key ? `${theme.accent}11` : 'transparent',
+      padding: '6px',
+      transition: 'all 0.2s',
+    }}
+  >
+    {/* ページ名 */}
+    <div style={{
+      padding: '2px 4px', fontSize: '12px',
+      color: currentPage === page.key ? theme.accent : theme.text,
+      fontWeight: currentPage === page.key ? 'bold' : 'normal',
+      display: 'flex', alignItems: 'center', gap: '6px',
+      marginBottom: '4px',
+    }}>
+      <span style={{
+        width: '6px', height: '6px', borderRadius: '50%',
+        background: currentPage === page.key ? theme.accent : theme.subtext,
+        flexShrink: 0,
+      }} />
+      {page.label}
+    </div>
 
-             {/* プレビュー画像クリックで切り替え */}
-             <div
-               onClick={() => { onPageChange(page.key); onClose() }}
-               style={{
-                 borderRadius: '6px', overflow: 'hidden',
-                 border: `1px solid ${currentPage === page.key ? theme.accent : theme.border}`,
-                 marginTop: '4px', opacity: 0.85,
-                 cursor: 'pointer',
-                 transition: 'all 0.2s',
-                 boxShadow: currentPage === page.key ? `0 0 8px ${theme.accent}44` : 'none',
-               }}
-             >
-               {page.key === 'dashboard'
-                 ? <DashboardPreview theme={theme} />
-                 : <ControlPreview theme={theme} />
-               }
-             </div>
-           </div>
-          ))}
+    {/* ミニプレビュー */}
+    <div style={{
+      borderRadius: '6px', overflow: 'hidden',
+      border: `1px solid ${theme.border}`,
+      opacity: 0.85,
+    }}>
+      {page.key === 'dashboard'
+        ? <DashboardPreview theme={theme} />
+        : <ControlPreview theme={theme} />
+      }
+    </div>
+  </div>
+))}
         </div>
       </div>
 
