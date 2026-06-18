@@ -16,12 +16,12 @@ export const AXIS_CTRL = {
 const LAYOUT = {
   desktop: {
     frameHeight: 340,
-    plotLeft: 56,
-    xMinLeft: 92,
+    plotLeft: 5,
+    xMinLeft: 60,
     top: 8,
     right: 8,
-    bottom: 38,
-    bottomTime: 24,
+    bottom: 30,
+    bottomTime: 18,
     brushExtra: 22,
     inputWidth: 52,
     selectWidth: 128,
@@ -90,4 +90,20 @@ export function axisInputStyle(theme: Theme, size: LayoutSize = 'desktop') {
     textAlign: 'center' as const,
     boxSizing: 'border-box' as const,
   }
+}
+
+export function calcDynamicFrameHeight(): number {
+  if (typeof window === 'undefined') return 340
+  const windowH = window.innerHeight
+  const headerH = 57     // ヘッダー
+  const statusH = 52     // ステータスバー
+  const controlH = 44    // パネルコントロール
+  const paddingH = 35 * 2 // dashboard-pageの上下padding
+  const gapH = 24        // グリッドのgap
+  const rows = 2         // 2行
+  const cardPaddingH = 12 * 2 // panel-cardの上下padding
+
+  const available = windowH - headerH - statusH - paddingH - gapH
+  const perPanel = Math.floor(available / rows) - controlH - cardPaddingH - 8
+  return Math.max(perPanel, 180)
 }

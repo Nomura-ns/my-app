@@ -26,6 +26,7 @@ import { useIsMobile } from '../hooks/useMediaQuery'
 import PanelAxisControls from './PanelAxisControls'
 import ChartAxisFrame, { getChartFrameHeight } from './ChartAxisFrame'
 import { getLineChartMargin, type LayoutSize } from '../axisControlStyles'
+import { calcDynamicFrameHeight } from '../axisControlStyles'
 
 const DEFAULT_PANELS: PanelConfig[] = [
   { id: 1, xAxis: 15004, yAddresses: [15000, 15002] },
@@ -66,22 +67,28 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 function NoDataHint({ theme, message }: { theme: Theme; message: string }) {
+  const parts = message.split('。')
   return (
     <div
       style={{
         position: 'absolute',
-        inset: 0,
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
-        padding: '16px',
+        gap: '4px',
         textAlign: 'center',
         fontSize: '12px',
         color: theme.subtext,
         pointerEvents: 'none',
+        width: '80%',
       }}
     >
-      {message}
+      {parts.filter(p => p.trim()).map((part, i) => (
+        <span key={i}>{part}。</span>
+      ))}
     </div>
   )
 }
@@ -103,15 +110,16 @@ function PanelChart({
   onYRangeChange: (range: AxisRange | undefined) => void
   onXRangeChange: (range: AxisRange | undefined) => void
 }) {
+  const frameHeight = calcDynamicFrameHeight() 
   const normalized = normalizePanel(panel)
   const isTimeMode = normalized.xAxis === 'time'
   const showXRange = !isTimeMode
-
+  
   if (!isValidPanel(normalized)) {
     return (
       <div
         style={{
-          height: getChartFrameHeight(layoutSize),
+          height: frameHeight,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -182,6 +190,7 @@ function PanelChart({
       showXRange={showXRange}
       chartMargin={chartMargin}
       layoutSize={layoutSize}
+      frameHeight={frameHeight}
       yRange={normalized.yRange}
       xRange={normalized.xRange}
       onYRangeChange={onYRangeChange}
@@ -202,8 +211,8 @@ function PanelChart({
 
 export default function DashboardPage({ theme, isPlaying, intervalSec, range }: Props) {
   const [panels, setPanels] = useState<PanelConfig[]>(loadPanels)
-  const isMobile = false
-  const layoutSize: LayoutSize = 'desktop'
+  const isMobile = useIsMobile()
+  const layoutSize: LayoutSize = isMobile ? 'mobile' : 'desktop'
 
   const allSelectedAddresses = useMemo(
     () => collectRequiredAddresses(panels),
@@ -255,6 +264,8 @@ export default function DashboardPage({ theme, isPlaying, intervalSec, range }: 
           background: theme.surface,
           border: `1px solid ${theme.border}`,
           color: theme.text,
+          marginTop: '-16px',   // ← 上の余白（増減で上下に移動）
+          marginBottom: '16px', // ← 下の余白（増減で上下に移動）
         }}
       >
         <span
@@ -293,6 +304,7 @@ export default function DashboardPage({ theme, isPlaying, intervalSec, range }: 
               key={panel.id}
               className="panel-card"
               style={{
+                position: 'relative',
                 background: theme.surface,
                 border: `1px solid ${theme.border}`,
               }}

@@ -87,6 +87,7 @@ type FrameProps = {
   yRange?: AxisRange
   xRange?: AxisRange
   layoutSize?: LayoutSize
+  frameHeight?: number
   onYRangeChange: (range: AxisRange | undefined) => void
   onXRangeChange: (range: AxisRange | undefined) => void
   children: ReactNode
@@ -104,13 +105,15 @@ export default function ChartAxisFrame({
   yRange,
   xRange,
   layoutSize = 'desktop',
+  frameHeight: framHeightProp,
   onYRangeChange,
   onXRangeChange,
   children,
   noDataOverlay,
 }: FrameProps) {
   const { top, right, bottom } = chartMargin
-  const { frameHeight, xMinLeft } = getLayoutConfig(layoutSize)
+  const { frameHeight: defaultHeight, xMinLeft } = getLayoutConfig(layoutSize)
+  const frameHeight = framHeightProp ?? defaultHeight
 
   return (
     <div
@@ -203,11 +206,27 @@ export default function ChartAxisFrame({
         </div>
       )}
 
-      {noDataOverlay && (
-        <div style={{ position: 'absolute', inset: 0, zIndex: 5, pointerEvents: 'none' }}>
-          {noDataOverlay}
-        </div>
-      )}
+           {noDataOverlay && (
+  <div
+    style={{
+      position: 'absolute',
+      inset: 0,
+      zIndex: 5,
+      pointerEvents: 'none',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      transform: `translate(${xMinLeft / 2}px, -${(top - bottom) / 2}px)`,
+    }}
+  >
+    {noDataOverlay}
+  </div>
+)}
+
+
+
+
+
     </div>
   )
 }

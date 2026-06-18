@@ -6,19 +6,43 @@ import { PAGES } from '../themes'
 // =============================================
 
 function DashboardPreview({ theme }: { theme: Theme }) {
+  // 簡易的なグラフデータ
+  const lines = [
+    { points: '10,50 25,30 40,45 55,20 70,35 80,15', color: '#0af3e0' },
+    { points: '10,60 25,45 40,55 55,40 70,50 80,35', color: '#43d0f3' },
+  ]
+
   return (
     <div style={{ padding: '8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-      {[1, 2, 3, 4].map(i => (
+      {[0, 1, 2, 3].map(i => (
         <div key={i} style={{
           background: theme.bg, border: `1px solid ${theme.border}`,
-          borderRadius: '6px', height: '60px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          borderRadius: '6px', padding: '4px', overflow: 'hidden',
         }}>
-          <svg width="80" height="40" viewBox="0 0 80 40">
-            <polyline
-              points={Array.from({ length: 10 }, (_, j) => `${j * 9},${40 - Math.random() * 30}`).join(' ')}
-              fill="none" stroke={theme.accent} strokeWidth="1.5"
-            />
+          {/* パネルタイトル */}
+          <div style={{ fontSize: '8px', color: theme.subtext, marginBottom: '2px' }}>
+            パネル{i + 1}
+          </div>
+          {/* グラフ */}
+          <svg width="100%" height="45" viewBox="0 0 90 55" preserveAspectRatio="none">
+            {/* グリッド */}
+            <line x1="0" y1="18" x2="90" y2="18" stroke={theme.border} strokeWidth="0.5" strokeDasharray="2,2" />
+            <line x1="0" y1="36" x2="90" y2="36" stroke={theme.border} strokeWidth="0.5" strokeDasharray="2,2" />
+            {/* Y軸 */}
+            <line x1="10" y1="0" x2="10" y2="55" stroke={theme.border} strokeWidth="0.5" />
+            {/* X軸 */}
+            <line x1="10" y1="48" x2="90" y2="48" stroke={theme.border} strokeWidth="0.5" />
+            {/* 折れ線 */}
+            {lines.map((line, li) => (
+              <polyline
+                key={li}
+                points={line.points}
+                fill="none"
+                stroke={line.color}
+                strokeWidth="1.5"
+                opacity={i % 2 === 0 ? 1 : 0.7}
+              />
+            ))}
           </svg>
         </div>
       ))}
@@ -28,21 +52,43 @@ function DashboardPreview({ theme }: { theme: Theme }) {
 
 function ControlPreview({ theme }: { theme: Theme }) {
   return (
-    <div style={{ padding: '8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-      {[1, 2, 3, 4].map(i => (
-        <div key={i} style={{
-          background: theme.bg, border: `1px solid ${theme.border}`,
-          borderRadius: '6px', height: '60px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
+    <div style={{ padding: '8px' }}>
+      <div style={{
+        background: theme.bg, border: `1px solid ${theme.border}`,
+        borderRadius: '6px', padding: '6px', display: 'flex',
+        flexDirection: 'column', gap: '4px',
+      }}>
+        {/* 前の枠 */}
+        <div style={{
+          background: `${theme.surface}88`, border: `1px solid ${theme.border}`,
+          borderRadius: '4px', padding: '4px 6px', fontSize: '9px', color: theme.subtext,
         }}>
-          <svg width="80" height="40" viewBox="0 0 80 40">
-            <polyline
-              points={Array.from({ length: 10 }, (_, j) => `${j * 9},${40 - Math.random() * 30}`).join(' ')}
-              fill="none" stroke={theme.accent} strokeWidth="1.5"
-            />
-          </svg>
+          <span style={{ color: theme.accent, fontSize: '8px', marginRight: '4px' }}>ロボット1</span>
+          下刃撮像
         </div>
-      ))}
+        {/* 矢印 */}
+        <div style={{ textAlign: 'center', color: theme.accent, fontSize: '10px' }}>▼</div>
+        {/* 現在枠 */}
+        <div style={{
+          background: theme.surface, border: `1.5px solid ${theme.accent}`,
+          borderRadius: '4px', padding: '4px 6px', fontSize: '9px', color: theme.text,
+          boxShadow: `0 0 6px ${theme.accent}33`,
+        }}>
+          <span style={{ color: theme.accent, fontSize: '8px', marginRight: '4px' }}>ロボット1</span>
+          上刃ストックから移動
+        </div>
+        {/* 矢印 */}
+        <div style={{ textAlign: 'center', color: theme.border, fontSize: '10px', opacity: 0.4 }}>▼</div>
+        {/* 次の枠 */}
+        <div style={{
+          background: 'transparent', border: `1px dashed ${theme.border}`,
+          borderRadius: '4px', padding: '4px 6px', fontSize: '9px', color: theme.subtext,
+          opacity: 0.5,
+        }}>
+          <span style={{ fontSize: '8px', marginRight: '4px' }}>ロボット1</span>
+          上刃組換台から移動
+        </div>
+      </div>
     </div>
   )
 }
@@ -111,36 +157,39 @@ export default function Sidebar({ theme, currentPage, sidebarOpen, onPageChange,
           </p>
           {PAGES.map(page => (
             <div key={page.key} style={{ marginBottom: '12px' }}>
-              <button
-                onClick={() => { onPageChange(page.key); onClose() }}
-                style={{
-                  width: '100%', textAlign: 'left',
-                  padding: '6px 8px', borderRadius: '6px',
-                  border: `1px solid ${currentPage === page.key ? theme.accent : 'transparent'}`,
-                  background: currentPage === page.key ? `${theme.accent}22` : 'transparent',
-                  color: theme.text, cursor: 'pointer', fontSize: '12px',
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  transition: 'all 0.15s',
-                }}
-              >
-                <span style={{
-                  width: '6px', height: '6px', borderRadius: '50%',
-                  background: currentPage === page.key ? theme.accent : theme.subtext,
-                  flexShrink: 0,
-                }} />
-                {page.label}
-              </button>
+              {/* ページ名（クリック不要、表示のみ） */}
               <div style={{
-                borderRadius: '6px', overflow: 'hidden',
-                border: `1px solid ${theme.border}`,
-                marginTop: '4px', opacity: 0.85,
+                padding: '4px 8px', fontSize: '12px',
+                color: currentPage === page.key ? theme.accent : theme.text,
+                fontWeight: currentPage === page.key ? 'bold' : 'normal',
+                display: 'flex', alignItems: 'center', gap: '6px',
               }}>
-                {page.key === 'dashboard'
-                  ? <DashboardPreview theme={theme} />
-                  : <ControlPreview theme={theme} />
-                }
-              </div>
-            </div>
+                 <span style={{
+                   width: '6px', height: '6px', borderRadius: '50%',
+                   background: currentPage === page.key ? theme.accent : theme.subtext,
+                   flexShrink: 0,
+               }} />
+               {page.label}
+             </div>
+
+             {/* プレビュー画像クリックで切り替え */}
+             <div
+               onClick={() => { onPageChange(page.key); onClose() }}
+               style={{
+                 borderRadius: '6px', overflow: 'hidden',
+                 border: `1px solid ${currentPage === page.key ? theme.accent : theme.border}`,
+                 marginTop: '4px', opacity: 0.85,
+                 cursor: 'pointer',
+                 transition: 'all 0.2s',
+                 boxShadow: currentPage === page.key ? `0 0 8px ${theme.accent}44` : 'none',
+               }}
+             >
+               {page.key === 'dashboard'
+                 ? <DashboardPreview theme={theme} />
+                 : <ControlPreview theme={theme} />
+               }
+             </div>
+           </div>
           ))}
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import type { ThemeKey, PageKey } from './types'
 import { THEMES, PAGES } from './themes'
 import Sidebar from './components/Sidebar'
@@ -16,6 +16,25 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const theme = THEMES[themeKey]
+  const settingsRef = useRef<HTMLDivElement>(null)
+  const gearBtnRef = useRef<HTMLDivElement>(null) // ← 追加
+
+useEffect(() => {
+  const handler = (e: MouseEvent) => {
+    if (
+      settingsRef.current &&
+      !settingsRef.current.contains(e.target as Node) &&
+      gearBtnRef.current &&
+      !gearBtnRef.current.contains(e.target as Node) // ← 歯車ボタンは除外
+    ) {
+      setShowSettings(false)
+    }
+  }
+  if (showSettings) {
+    document.addEventListener('mousedown', handler)
+  }
+  return () => document.removeEventListener('mousedown', handler)
+}, [showSettings])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: theme.bg, color: theme.text, transition: 'background-color 0.3s, color 0.3s' }}>
@@ -34,18 +53,61 @@ export default function App() {
             {PAGES.find(p => p.key === currentPage)?.label}
           </span>
         </div>
-        <button onClick={() => setShowSettings(p => !p)} style={{
-          background: showSettings ? `${theme.accent}33` : 'transparent',
-          border: `1px solid ${showSettings ? theme.accent : theme.border}`,
-          borderRadius: '8px', padding: '6px 10px',
-          cursor: 'pointer', fontSize: '18px', lineHeight: 1, transition: 'all 0.2s',
-        }}>
-          ⚙️
-        </button>
+
+        {/* 歯車ボタン */}
+        <div
+          ref={gearBtnRef}
+          style={{ position: 'relative', display: 'inline-block' }}
+          onMouseEnter={(e) => {
+            const tooltip = e.currentTarget.querySelector('.settings-tooltip') as HTMLElement
+            if (tooltip) tooltip.style.opacity = '1'
+          }}
+          onMouseLeave={(e) => {
+            const tooltip = e.currentTarget.querySelector('.settings-tooltip') as HTMLElement
+            if (tooltip) tooltip.style.opacity = '0'
+          }}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowSettings(p => !p)
+            }}
+            style={{
+              background: showSettings ? `${theme.accent}33` : 'transparent',
+              border: `1px solid ${showSettings ? theme.accent : theme.border}`,
+              borderRadius: '8px', padding: '6px 10px',
+              cursor: 'pointer', fontSize: '18px', lineHeight: 1, transition: 'all 0.2s',
+            }}
+          >
+            ⚙️
+          </button>
+          <span
+            className="settings-tooltip"
+            style={{
+              position: 'absolute',
+              bottom: '-28px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: 'rgba(0,0,0,0.75)',
+              color: '#fff',
+              fontSize: '11px',
+              padding: '2px 8px',
+              borderRadius: '4px',
+              whiteSpace: 'nowrap',
+              opacity: 0,
+              pointerEvents: 'none',
+              transition: 'opacity 0.2s',
+              zIndex: 200,
+            }}
+          >
+            設定
+          </span>
+        </div>
       </header>
 
       {/* ヘッダー下レイアウト */}
       <div style={{ position: 'relative', flex: 1 }}>
+
 
         {/* サイドバー */}
         <Sidebar
@@ -59,17 +121,19 @@ export default function App() {
 
         {/* 設定パネル */}
         {showSettings && (
-          <SettingsPanel
-            theme={theme}
-            themeKey={themeKey}
-            range={range}
-            intervalSec={intervalSec}
-            isPlaying={isPlaying}
-            onThemeChange={setThemeKey}
-            onRangeChange={setRange}
-            onIntervalChange={setIntervalSec}
-            onPlayingChange={setIsPlaying}
-          />
+          <div ref={settingsRef}>
+            <SettingsPanel
+              theme={theme}
+              themeKey={themeKey}
+              range={range}
+              intervalSec={intervalSec}
+              isPlaying={isPlaying}
+              onThemeChange={setThemeKey}
+              onRangeChange={setRange}
+              onIntervalChange={setIntervalSec}
+              onPlayingChange={setIsPlaying}
+            />
+          </div>
         )}
 
         {/* ページコンテンツ */}
