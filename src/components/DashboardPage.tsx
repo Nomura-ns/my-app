@@ -63,15 +63,20 @@ const DEFAULT_PANELS: PanelConfig[] = [
 
 const PANELS_STORAGE_KEY = 'plc-dashboard-panels'
 
-function loadPanels(): PanelConfig[] {
+function loadPanels(isMobile: boolean): PanelConfig[] {
   try {
     const raw = localStorage.getItem(PANELS_STORAGE_KEY)
     if (!raw) return DEFAULT_PANELS
     const parsed = JSON.parse(raw) as Record<string, unknown>[]
     if (!Array.isArray(parsed) || parsed.length !== 4) return DEFAULT_PANELS
-    return parsed.map((p, i) =>
+    const panels = parsed.map((p, i) =>
       migrateLegacyPanel({ ...p, id: (p.id as number) ?? i + 1 }, (p.id as number) ?? i + 1),
     )
+    // モバイルは全パネルをtime固定に
+    if (isMobile) {
+      return panels.map((p) => normalizePanel({ ...p, xAxis: 'time', xRange: undefined }))
+    }
+    return panels
   } catch {
     return DEFAULT_PANELS
   }
@@ -258,11 +263,12 @@ export default function DashboardPage({
   range,
   mobile = false,
 }: Props) {
-  const [panels, setPanels] = useState<PanelConfig[]>(loadPanels)
-  const [activePanelId, setActivePanelId] = useState<number>(1)
   const deviceMobile = useIsMobile()
-
   const isMobile = mobile || deviceMobile
+  
+  const [panels, setPanels] = useState<PanelConfig[]>(() => loadPanels(isMobile))
+  const [activePanelId, setActivePanelId] = useState<number>(1)
+ 
   const layoutSize: LayoutSize = isMobile ? 'mobile' : 'desktop'
 
   
@@ -293,10 +299,30 @@ export default function DashboardPage({
       return next
     })
   }, intervalMs)
+  
   return () => clearInterval(id)
  }, [isMobile, isPlaying, intervalSec, range, allSelectedAddresses])
  // ---------------------------------
+ useEffect(() => {
+  if (!isMobile || !isPlaying) return
+  const intervalMs = Math.max(intervalSec * 1000, 100)
+  const id = setInterval(() => {
+    setMockData(prev => {
+      const next = [...prev.slice(-range + 1), generateMockPoint(allSelectedAddresses, 0)]
+      return next
+    })
+  }, intervalMs)
+  return () => clearInterval(id)
+}, [isMobile, isPlaying, intervalSec, range, allSelectedAddresses])
+// ---------------------------------
 
+// ↓これを新たに追加（別のuseEffect）
+useEffect(() => {
+  if (!isMobile) return
+  setPanels((prev) =>
+    prev.map((p) => normalizePanel({ ...p, xAxis: 'time', xRange: undefined }))
+  )
+}, [isMobile])
   const displayData = isMobile ? mockData : data.slice(-range)
 
   const savePanels = (next: PanelConfig[]) => {
