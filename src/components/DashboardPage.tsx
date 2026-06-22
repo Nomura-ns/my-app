@@ -357,6 +357,7 @@ useEffect(() => {
       
     return (
     <div className="dashboard-page">
+     {!isMobile &&(
       <div
         className="status-bar"
         style={{
@@ -396,6 +397,7 @@ useEffect(() => {
           <span style={{ color: theme.subtext }}>データ点数: {data.length}</span>
         )}
       </div>
+     )}  
        {/* ✅ モバイル時のパネル選択タブ */}
       {isMobile && (
         <div style={{
