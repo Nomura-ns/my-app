@@ -31,6 +31,7 @@ export default function SettingsPanel({
       } : {
         right: '16px', padding: '20px 24px', minWidth: '420px',
       }),
+      maxHeight: 'calc(100dvh - 73px)', overflowY: 'auto',
     }}>
       <p style={{ fontSize: '13px', fontWeight: 'bold', color: theme.accent, margin: 0 }}>設定</p>
 
