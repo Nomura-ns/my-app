@@ -16,7 +16,7 @@ export function useFrameHeight(layoutSize: LayoutSize): number {
     const next = calcDynamicFrameHeight(layoutSize)
 
     if (layoutSize === 'mobile' && !force) {
-      if (Math.abs(next - stableHeightRef.current) < 80) return
+      if (Math.abs(next - stableHeightRef.current) < 120) return
     }
 
     stableHeightRef.current = next
