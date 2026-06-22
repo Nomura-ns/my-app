@@ -22,7 +22,7 @@ export default function SettingsPanel({
 
   return (
     <div style={{
-      position: 'fixed', top: '57px', zIndex: 100,
+      position: 'fixed', top: '57px', bottom: '8px', zIndex: 100,
       background: theme.surface, border: `1px solid ${theme.border}`,
       borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
       display: 'flex', flexDirection: 'column', gap: '14px',
@@ -31,7 +31,7 @@ export default function SettingsPanel({
       } : {
         right: '16px', padding: '20px 24px', minWidth: '420px',
       }),
-      maxHeight: 'calc(100dvh - 73px)', overflowY: 'auto',
+      overflowY: 'auto',
     }}>
       <p style={{ fontSize: '13px', fontWeight: 'bold', color: theme.accent, margin: 0 }}>設定</p>
 
