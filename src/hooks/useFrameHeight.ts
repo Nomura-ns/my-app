@@ -12,53 +12,43 @@ export function useFrameHeight(layoutSize: LayoutSize): number {
   const stableHeightRef = useRef<number>(FALLBACK[layoutSize])
 
   useEffect(() => {
-  const update = (force = false) => {
-    const next = calcDynamicFrameHeight(layoutSize)
+    const update = (force = false) => {
+      const next = calcDynamicFrameHeight(layoutSize)
 
-    if (layoutSize === 'mobile' && !force) {
-      if (Math.abs(next - stableHeightRef.current) < 120) return
+      if (layoutSize === 'mobile' && !force) {
+        // 変動が小さい（アドレスバー収縮程度）なら無視
+        if (Math.abs(next - stableHeightRef.current) < 80) return
+      }
+
+      stableHeightRef.current = next
+      setHeight(next)
     }
 
-    stableHeightRef.current = next
-    setHeight(next)
-  }
+    const onResize = () => {
+      if (layoutSize === 'mobile') {
+        // デバウンスして落ち着いてから判定
+        if (timerRef.current) clearTimeout(timerRef.current)
+        timerRef.current = setTimeout(() => update(), 300)
+      } else {
+        update()
+      }
+    }
 
-  const onResize = () => {
-    if (layoutSize === 'mobile') {
+    const onOrientation = () => {
+      // 向き変更は確実に反映
       if (timerRef.current) clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => update(), 300)
-    } else {
-      update()
+      timerRef.current = setTimeout(() => update(true), 300)
     }
-  }
 
-  const onOrientation = () => {
-    if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => update(true), 300)
-  }
-
-  update(true)
-
-  // visualViewport があればそちらを監視
-  const vv = window.visualViewport
-  if (vv && layoutSize === 'mobile') {
-    vv.addEventListener('resize', onResize)
-  } else {
+    update(true)
     window.addEventListener('resize', onResize)
-  }
-  window.addEventListener('orientationchange', onOrientation)
-
-  return () => {
-    const vv = window.visualViewport
-    if (vv && layoutSize === 'mobile') {
-      vv.removeEventListener('resize', onResize)
-    } else {
+    window.addEventListener('orientationchange', onOrientation)
+    return () => {
       window.removeEventListener('resize', onResize)
+      window.removeEventListener('orientationchange', onOrientation)
+      if (timerRef.current) clearTimeout(timerRef.current)
     }
-    window.removeEventListener('orientationchange', onOrientation)
-    if (timerRef.current) clearTimeout(timerRef.current)
-  }
-}, [layoutSize])
+  }, [layoutSize])
 
   return height
 }
