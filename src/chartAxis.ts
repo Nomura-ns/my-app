@@ -192,14 +192,15 @@ export function resolveDomain(
   }
   const hasAuto = Number.isFinite(autoMin) && Number.isFinite(autoMax) && autoMin <= autoMax
 
-  const min = specified?.min ?? (hasAuto ? autoMin : undefined)
-  const max = specified?.max ?? (hasAuto ? autoMax : undefined)
+  // ?? ではなく !== undefined で判定し、0 などの falsy 値も正しく扱う
+  const min = specified?.min !== undefined ? specified.min : (hasAuto ? autoMin : undefined)
+  const max = specified?.max !== undefined ? specified.max : (hasAuto ? autoMax : undefined)
 
   if (min === undefined && max === undefined) return ['auto', 'auto']
   if (min !== undefined && max !== undefined) {
     if (min === max) return [min - 1, max + 1]
     return [min, max]
   }
-  if (min !== undefined) return [min, hasAuto ? Math.max(max ?? autoMax, min + 1) : min + 100]
-  return [hasAuto ? Math.min(min ?? autoMin, max! - 1) : max! - 100, max!]
+  if (min !== undefined) return [min, hasAuto ? Math.max(autoMax, min + 1) : min + 100]
+  return [hasAuto ? Math.min(autoMin, max! - 1) : max! - 100, max!]
 }

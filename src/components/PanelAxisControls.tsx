@@ -148,24 +148,36 @@ export default function PanelAxisControls({
       </AxisGroup>
 
       <AxisGroup label="X軸" theme={theme}>
-        <select
-          className="axis-group__select"
-          value={xAxis === 'time' ? 'time' : String(xAxis)}
-          onChange={(e) => {
-            const v = e.target.value
-            onXAxisChange(v === 'time' ? 'time' : Number(v))
-          }}
-          style={sel}
-        >
-          <option value="time">時系列</option>
-          <optgroup label="データ">
-            {ALL_REGISTERS.map((addr) => (
-              <option key={addr} value={String(addr)}>
-                {formatRegisterLabel(addr)}
-              </option>
-            ))}
+      {isMobile ? (
+       <span style={{
+        ...sel,
+        display: 'inline-flex',
+        alignItems: 'center',
+        color: theme.subtext,
+        fontSize: AXIS_CTRL.fontSize,
+      }}>
+      時系列
+      </span>
+      ) : (
+      <select
+       className="axis-group__select"
+       value={xAxis === 'time' ? 'time' : String(xAxis)}
+       onChange={(e) => {
+        const v = e.target.value
+        onXAxisChange(v === 'time' ? 'time' : Number(v))
+      }}
+      style={sel}
+      >
+      <option value="time">時系列</option>
+      <optgroup label="データ">
+        {ALL_REGISTERS.map((addr) => (
+          <option key={addr} value={String(addr)}>
+            {formatRegisterLabel(addr)}
+          </option>
+           ))}
           </optgroup>
-        </select>
+         </select>
+        )}
       </AxisGroup>
     </div>
   )

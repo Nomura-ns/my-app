@@ -211,7 +211,7 @@ function PanelChart({
           ) : (
             <XAxis dataKey={xKey} type="number" tick={{ fontSize: 10, fill: theme.subtext }} domain={xDomain} />
           )}
-          <YAxis tick={{ fontSize: 10, fill: theme.subtext }} domain={yDomain} />
+          <YAxis tick={{ fontSize: 10, fill: theme.subtext }} domain={yDomain} allowDataOverflow={true} />
           <Tooltip contentStyle={{ background: theme.surface, border: `1px solid ${theme.border}`, color: theme.text }} />
           {series.map((s) => (
             <Line key={s.yKey} type="monotone" dataKey={s.yKey} name={s.label}
@@ -311,18 +311,19 @@ export default function DashboardPage({
   }
 
   const handleXAxisChange = (panelId: number, xAxis: XAxisKey) => {
-    setPanels((prev) =>
-      savePanels(
-        prev.map((p) => {
-          if (p.id !== panelId) return p
-          if (xAxis === 'time') {
-            return normalizePanel({ ...p, xAxis: 'time', xRange: undefined })
-          }
-          return normalizePanel({ ...p, xAxis })
-        }),
-      ),
-    )
-  }
+  const resolvedXAxis: XAxisKey = isMobile ? 'time' : xAxis
+  setPanels((prev) =>
+    savePanels(
+      prev.map((p) => {
+        if (p.id !== panelId) return p
+        if (resolvedXAxis === 'time') {
+          return normalizePanel({ ...p, xAxis: 'time', xRange: undefined })
+        }
+        return normalizePanel({ ...p, xAxis: resolvedXAxis })
+      }),
+    ),
+  )
+}
 
   const statusColor =
     status === 'open' ? '#34d399' : status === 'error' ? '#f87171' : theme.subtext

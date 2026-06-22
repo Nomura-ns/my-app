@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { calcDynamicFrameHeight, type LayoutSize } from '../axisControlStyles'
 
 const FALLBACK: Record<LayoutSize, number> = {
@@ -8,12 +8,46 @@ const FALLBACK: Record<LayoutSize, number> = {
 
 export function useFrameHeight(layoutSize: LayoutSize): number {
   const [height, setHeight] = useState<number>(FALLBACK[layoutSize])
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const stableHeightRef = useRef<number>(FALLBACK[layoutSize])
 
   useEffect(() => {
-    const update = () => setHeight(calcDynamicFrameHeight(layoutSize))
-    update()
-    window.addEventListener('resize', update)
-    return () => window.removeEventListener('resize', update)
+    const update = (force = false) => {
+      const next = calcDynamicFrameHeight(layoutSize)
+
+      if (layoutSize === 'mobile' && !force) {
+        // 変動が小さい（アドレスバー収縮程度）なら無視
+        if (Math.abs(next - stableHeightRef.current) < 80) return
+      }
+
+      stableHeightRef.current = next
+      setHeight(next)
+    }
+
+    const onResize = () => {
+      if (layoutSize === 'mobile') {
+        // デバウンスして落ち着いてから判定
+        if (timerRef.current) clearTimeout(timerRef.current)
+        timerRef.current = setTimeout(() => update(), 300)
+      } else {
+        update()
+      }
+    }
+
+    const onOrientation = () => {
+      // 向き変更は確実に反映
+      if (timerRef.current) clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => update(true), 300)
+    }
+
+    update(true)
+    window.addEventListener('resize', onResize)
+    window.addEventListener('orientationchange', onOrientation)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      window.removeEventListener('orientationchange', onOrientation)
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
   }, [layoutSize])
 
   return height
