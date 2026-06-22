@@ -43,6 +43,7 @@ export function usePlcWebSocket({
   const wsRef = useRef<WebSocket | null>(null)
   const addressesRef = useRef(selectedAddresses)
   const isPlayingRef = useRef(isPlaying)
+  const intervalSecRef = useRef(intervalSec)
 
   useEffect(() => {
     addressesRef.current = selectedAddresses
@@ -51,6 +52,10 @@ export function usePlcWebSocket({
   useEffect(() => {
     isPlayingRef.current = isPlaying
   }, [isPlaying])
+
+  useEffect(() => {
+    intervalSecRef.current = intervalSec 
+  }, [intervalSec])
 
   const appendPoint = useCallback((values: number[], ts: number, addresses: number[]) => {
     const time = formatPlcTime(ts)
@@ -130,7 +135,7 @@ export function usePlcWebSocket({
       ws.close()
       wsRef.current = null
     }
-  }, [enabled, intervalSec, appendPoint])
+  }, [enabled, appendPoint])
 
   return { status, errorMessage, data, browserCount }
 }

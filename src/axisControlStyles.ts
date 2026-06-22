@@ -92,18 +92,36 @@ export function axisInputStyle(theme: Theme, size: LayoutSize = 'desktop') {
   }
 }
 
-export function calcDynamicFrameHeight(): number {
-  if (typeof window === 'undefined') return 340
+export function calcDynamicFrameHeight(size: LayoutSize = 'desktop'): number {
+  if (typeof window === 'undefined') return LAYOUT[size].frameHeight
+
   const windowH = window.innerHeight
-  const headerH = 57     // ヘッダー
-  const statusH = 52     // ステータスバー
-  const controlH = 44    // パネルコントロール
-  const paddingH = 35 * 2 // dashboard-pageの上下padding
-  const gapH = 24        // グリッドのgap
-  const rows = 2         // 2行
-  const cardPaddingH = 12 * 2 // panel-cardの上下padding
+
+  if (size === 'mobile') {
+  const windowH = window.innerHeight
+  const headerH = 49
+  const statusH = 39
+  const tabH = 31 + 12      // タブ + marginBottom
+  const controlH = 113
+  const pagePaddingH = 10 * 2
+  const statusMarginH = 16 + 16
+  const cardPaddingH = 10 * 2
+
+  const available = windowH - headerH - statusH - tabH - controlH
+    - pagePaddingH - statusMarginH - cardPaddingH - 8
+  return Math.max(available, 160)
+}
+
+  // desktop
+  const headerH = 57
+  const statusH = 52
+  const paddingH = 35 * 2
+  const controlH = 44
+  const cardPaddingH = 12 * 2
+  const gapH = 24
+  const rows = 2
 
   const available = windowH - headerH - statusH - paddingH - gapH
   const perPanel = Math.floor(available / rows) - controlH - cardPaddingH - 8
-  return Math.max(perPanel, 180)
+  return Math.max(perPanel, 200)
 }

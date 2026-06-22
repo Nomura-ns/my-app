@@ -88,6 +88,10 @@ type FrameProps = {
   xRange?: AxisRange
   layoutSize?: LayoutSize
   frameHeight?: number
+  xInputLeft?: number   // X軸最小入力のleft位置（省略時はxMinLeftを使用）
+  xInputRight?: number  // X軸最大入力のright位置（省略時はchartMargin.rightを使用）
+  yInputTop?: number    // Y軸最大入力のtop位置（省略時はchartMargin.topを使用）
+  yInputBottom?: number // Y軸最小入力のbottom位置（省略時はchartMargin.bottomを使用）
   onYRangeChange: (range: AxisRange | undefined) => void
   onXRangeChange: (range: AxisRange | undefined) => void
   children: ReactNode
@@ -97,6 +101,8 @@ type FrameProps = {
 /**
  * 軸入力をプロット領域の端（Y軸上下・X軸左右）に合わせて配置。
  * グラフは枠いっぱいに描画し、入力は余白に重ねる。
+ * xInputLeft / xInputRight / yInputTop / yInputBottom を指定することで、
+ * 各軸入力位置をグラフ余白と独立して制御できる。
  */
 export default function ChartAxisFrame({
   theme,
@@ -106,6 +112,10 @@ export default function ChartAxisFrame({
   xRange,
   layoutSize = 'desktop',
   frameHeight: framHeightProp,
+  xInputLeft,
+  xInputRight,
+  yInputTop,
+  yInputBottom,
   onYRangeChange,
   onXRangeChange,
   children,
@@ -114,6 +124,12 @@ export default function ChartAxisFrame({
   const { top, right, bottom } = chartMargin
   const { frameHeight: defaultHeight, xMinLeft } = getLayoutConfig(layoutSize)
   const frameHeight = framHeightProp ?? defaultHeight
+
+  // 各軸入力位置：明示指定がなければグラフ余白由来の値にフォールバック
+  const resolvedXInputLeft = xInputLeft ?? xMinLeft
+  const resolvedXInputRight = xInputRight ?? right
+  const resolvedYInputTop = yInputTop ?? top
+  const resolvedYInputBottom = yInputBottom ?? bottom
 
   return (
     <div
@@ -128,13 +144,14 @@ export default function ChartAxisFrame({
         boxSizing: 'border-box',
       }}
     >
-      <div style={{ position: 'absolute', inset: 0 }}>{children}</div>
+      <div style={{ width: '100%', height: '100%' }}>{children}</div>
 
+      {/* Y軸最大（上） */}
       <div
         style={{
           position: 'absolute',
           left: 4,
-          top,
+          top: resolvedYInputTop,
           zIndex: 10,
           transform: 'translateY(-2px)',
         }}
@@ -149,11 +166,12 @@ export default function ChartAxisFrame({
         />
       </div>
 
+      {/* Y軸最小（下） */}
       <div
         style={{
           position: 'absolute',
           left: 4,
-          bottom,
+          bottom: resolvedYInputBottom,
           zIndex: 10,
           transform: 'translateY(2px)',
         }}
@@ -168,11 +186,12 @@ export default function ChartAxisFrame({
         />
       </div>
 
+      {/* X軸最小（左） */}
       {showXRange && (
         <div
           style={{
             position: 'absolute',
-            left: xMinLeft,
+            left: resolvedXInputLeft,
             bottom: 4,
             zIndex: 10,
           }}
@@ -187,11 +206,12 @@ export default function ChartAxisFrame({
         </div>
       )}
 
+      {/* X軸最大（右） */}
       {showXRange && (
         <div
           style={{
             position: 'absolute',
-            right,
+            right: resolvedXInputRight,
             bottom: 4,
             zIndex: 10,
           }}
@@ -206,27 +226,22 @@ export default function ChartAxisFrame({
         </div>
       )}
 
-           {noDataOverlay && (
-  <div
-    style={{
-      position: 'absolute',
-      inset: 0,
-      zIndex: 5,
-      pointerEvents: 'none',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      transform: `translate(${xMinLeft / 2}px, -${(top - bottom) / 2}px)`,
-    }}
-  >
-    {noDataOverlay}
-  </div>
-)}
-
-
-
-
-
+      {noDataOverlay && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 5,
+            pointerEvents: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transform: `translate(${xMinLeft / 2}px, -${(top - bottom) / 2}px)`,
+          }}
+        >
+          {noDataOverlay}
+        </div>
+      )}
     </div>
   )
 }

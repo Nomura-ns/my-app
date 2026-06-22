@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
+
 import {
   LineChart,
   Line,
@@ -10,7 +11,7 @@ import {
   Brush,
 } from 'recharts'
 import type { AxisRange, Theme, DataPoint, PanelConfig, XAxisKey } from '../types'
-import { getStrokeColor } from '../plc'
+import { getStrokeColor, addressToDataKey } from '../plc'
 import {
   collectRequiredAddresses,
   countPlottablePoints,
@@ -24,9 +25,34 @@ import {
 import { usePlcWebSocket } from '../hooks/usePlcWebSocket'
 import { useIsMobile } from '../hooks/useMediaQuery'
 import PanelAxisControls from './PanelAxisControls'
-import ChartAxisFrame, { getChartFrameHeight } from './ChartAxisFrame'
+import ChartAxisFrame from './ChartAxisFrame'
 import { getLineChartMargin, type LayoutSize } from '../axisControlStyles'
-import { calcDynamicFrameHeight } from '../axisControlStyles'
+import { useFrameHeight } from '../hooks/useFrameHeight'
+
+// ランダムデータ生成ユーティリティ（モバイルプレビュー用）
+ function generateMockPoint(addresses: number[], index: number): DataPoint {
+   const point: DataPoint = {
+    time: new Date(Date.now() - index * 100).toLocaleTimeString('ja-JP', {
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+    }),
+    _ts: Date.now() - index * 100,  // ← これを追加
+  }
+  for (const addr of addresses) {
+    // アドレスごとに異なる波形でリアルっぽく
+    const base = (addr % 100)           // アドレスで基準値をずらす
+    const noise = (Math.random() - 0.5) * 20
+    const wave = Math.sin(Date.now() / 1000 + addr) * 30
+    point[addressToDataKey(addr)] = Math.round((base + wave + noise) * 10) / 10
+  }
+  return point
+}
+
+function generateMockData(range: number, addresses: number[]): DataPoint[] {
+  return Array.from({ length: range }, (_, i) =>
+    generateMockPoint(addresses, range - i)
+  )
+}
+
 
 const DEFAULT_PANELS: PanelConfig[] = [
   { id: 1, xAxis: 15004, yAddresses: [15000, 15002] },
@@ -56,8 +82,8 @@ type Props = {
   isPlaying: boolean
   intervalSec: number
   range: number
+  mobile?: boolean
 }
-
 const STATUS_LABEL: Record<string, string> = {
   idle: '未接続',
   connecting: '接続中…',
@@ -67,23 +93,34 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 function NoDataHint({ theme, message }: { theme: Theme; message: string }) {
+  const isMobile = useIsMobile()
   const parts = message.split('。')
   return (
     <div
       style={{
         position: 'absolute',
-        top: '50%',
+        top: isMobile ? '16px': '50%',
         left: '50%',
-        transform: 'translate(-50%, -50%)',
+        transform: isMobile
+         ? 'translate(-35%, 180%)'
+         : 'translate(-50%, -110%)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         gap: '4px',
         textAlign: 'center',
-        fontSize: '12px',
+        fontSize: isMobile
+         ? '10px'
+         : '12px',
         color: theme.subtext,
         pointerEvents: 'none',
-        width: '80%',
+        width: isMobile
+         ? '92%'
+         : '80%',
+        maxWidth: '100%',
+        padding: isMobile
+          ? '0 8px'
+          : '0',
       }}
     >
       {parts.filter(p => p.trim()).map((part, i) => (
@@ -110,7 +147,22 @@ function PanelChart({
   onYRangeChange: (range: AxisRange | undefined) => void
   onXRangeChange: (range: AxisRange | undefined) => void
 }) {
-  const frameHeight = calcDynamicFrameHeight() 
+  const frameHeight = useFrameHeight(layoutSize)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const observer = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect
+      if (width > 0 && height > 0) {
+        setSize({ width, height })
+      }
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
   const normalized = normalizePanel(panel)
   const isTimeMode = normalized.xAxis === 'time'
   const showXRange = !isTimeMode
@@ -132,6 +184,8 @@ function PanelChart({
     )
   }
 
+  
+
   const series = getChartSeries(normalized)
   const yKeys = series.map((s) => s.yKey)
   const xKey = series[0]?.xKey
@@ -142,46 +196,34 @@ function PanelChart({
   const withBrush = isTimeMode && !isPlaying
   const chartMargin = getLineChartMargin(showXRange, withBrush, layoutSize)
 
-  const chartEl = (
-    <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={displayData} margin={chartMargin}>
-        <CartesianGrid strokeDasharray="3 3" stroke={theme.border} />
-        {isTimeMode ? (
-          <XAxis dataKey="time" tick={{ fontSize: 10, fill: theme.subtext }} />
-        ) : (
-          <XAxis
-            dataKey={xKey}
-            type="number"
-            tick={{ fontSize: 10, fill: theme.subtext }}
-            domain={xDomain}
-          />
-        )}
-        <YAxis tick={{ fontSize: 10, fill: theme.subtext }} domain={yDomain} />
-        <Tooltip
-          contentStyle={{
-            background: theme.surface,
-            border: `1px solid ${theme.border}`,
-            color: theme.text,
-          }}
-        />
-        {series.map((s) => (
-          <Line
-            key={s.yKey}
-            type="monotone"
-            dataKey={s.yKey}
-            name={s.label}
-            stroke={getStrokeColor(s.yAddr)}
-            strokeWidth={2}
-            dot={false}
-            isAnimationActive={false}
-            connectNulls
-          />
-        ))}
-        {isTimeMode && !isPlaying && (
-          <Brush dataKey="time" height={20} stroke={theme.accent} fill={theme.surface} />
-        )}
-      </LineChart>
-    </ResponsiveContainer>
+ const chartEl = (
+    <div ref={containerRef} style={{ width: '100%', height: '100%' }}>
+      {size && (
+        <LineChart
+          width={size.width}
+          height={size.height}
+          data={displayData}
+          margin={chartMargin}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke={theme.border} />
+          {isTimeMode ? (
+            <XAxis dataKey="time" tick={{ fontSize: 10, fill: theme.subtext }} />
+          ) : (
+            <XAxis dataKey={xKey} type="number" tick={{ fontSize: 10, fill: theme.subtext }} domain={xDomain} />
+          )}
+          <YAxis tick={{ fontSize: 10, fill: theme.subtext }} domain={yDomain} />
+          <Tooltip contentStyle={{ background: theme.surface, border: `1px solid ${theme.border}`, color: theme.text }} />
+          {series.map((s) => (
+            <Line key={s.yKey} type="monotone" dataKey={s.yKey} name={s.label}
+              stroke={getStrokeColor(s.yAddr)} strokeWidth={2} dot={false}
+              isAnimationActive={false} connectNulls />
+          ))}
+          {isTimeMode && !isPlaying && (
+            <Brush dataKey="time" height={20} stroke={theme.accent} fill={theme.surface} />
+          )}
+        </LineChart>
+      )}
+    </div>
   )
 
   return (
@@ -209,11 +251,22 @@ function PanelChart({
   )
 }
 
-export default function DashboardPage({ theme, isPlaying, intervalSec, range }: Props) {
+export default function DashboardPage({
+  theme,
+  isPlaying,
+  intervalSec,
+  range,
+  mobile = false,
+}: Props) {
   const [panels, setPanels] = useState<PanelConfig[]>(loadPanels)
-  const isMobile = useIsMobile()
+  const [activePanelId, setActivePanelId] = useState<number>(1)
+  const deviceMobile = useIsMobile()
+
+  const isMobile = mobile || deviceMobile
   const layoutSize: LayoutSize = isMobile ? 'mobile' : 'desktop'
 
+  
+  const activePanel = panels.find((p) => p.id === activePanelId) ?? panels[0]
   const allSelectedAddresses = useMemo(
     () => collectRequiredAddresses(panels),
     [panels],
@@ -226,7 +279,25 @@ export default function DashboardPage({ theme, isPlaying, intervalSec, range }: 
     selectedAddresses: allSelectedAddresses,
   })
 
-  const displayData = data.slice(-range)
+  // --- モバイル用ランダムデータ ---
+ const [mockData, setMockData] = useState<DataPoint[]>(() =>
+  isMobile ? generateMockData(range, allSelectedAddresses) : []
+)
+
+ useEffect(() => {
+  if (!isMobile || !isPlaying) return
+  const intervalMs = Math.max(intervalSec * 1000, 100)
+  const id = setInterval(() => {
+    setMockData(prev => {
+      const next = [...prev.slice(-range + 1), generateMockPoint(allSelectedAddresses, 0)]
+      return next
+    })
+  }, intervalMs)
+  return () => clearInterval(id)
+ }, [isMobile, isPlaying, intervalSec, range, allSelectedAddresses])
+ // ---------------------------------
+
+  const displayData = isMobile ? mockData : data.slice(-range)
 
   const savePanels = (next: PanelConfig[]) => {
     localStorage.setItem(PANELS_STORAGE_KEY, JSON.stringify(next.map(normalizePanel)))
@@ -255,8 +326,9 @@ export default function DashboardPage({ theme, isPlaying, intervalSec, range }: 
 
   const statusColor =
     status === 'open' ? '#34d399' : status === 'error' ? '#f87171' : theme.subtext
-
-  return (
+    
+      
+    return (
     <div className="dashboard-page">
       <div
         className="status-bar"
@@ -264,7 +336,9 @@ export default function DashboardPage({ theme, isPlaying, intervalSec, range }: 
           background: theme.surface,
           border: `1px solid ${theme.border}`,
           color: theme.text,
-          marginTop: '-16px',   // ← 上の余白（増減で上下に移動）
+         marginTop: isMobile
+      ? '16px'
+      : '-16px',   // ← 上の余白（増減で上下に移動）
           marginBottom: '16px', // ← 下の余白（増減で上下に移動）
         }}
       >
@@ -295,9 +369,48 @@ export default function DashboardPage({ theme, isPlaying, intervalSec, range }: 
           <span style={{ color: theme.subtext }}>データ点数: {data.length}</span>
         )}
       </div>
+       {/* ✅ モバイル時のパネル選択タブ */}
+      {isMobile && (
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          marginBottom: '12px',
+        }}>
+          {panels.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setActivePanelId(p.id)}
+              style={{
+                flex: 1,
+                padding: '6px 0',
+                fontSize: '12px',
+                borderRadius: '6px',
+                border: `1px solid ${theme.border}`,
+                background: activePanelId === p.id ? theme.accent : theme.surface,
+                color: activePanelId === p.id ? '#fff' : theme.text,
+                cursor: 'pointer',
+                fontWeight: activePanelId === p.id ? 'bold' : 'normal',
+              }}
+            >
+              パネル {p.id}
+            </button>
+          ))}
+        </div>
+      )}
+      <div
+  style={{
+    display: 'grid',
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '24px', width: '100%' }}>
-        {panels.map((panel) => {
+    gridTemplateColumns: isMobile
+      ? '1fr'
+      : 'repeat(2, minmax(0, 1fr))',
+
+    gap: '24px',
+    width: '100%',
+    minWidth: 0,
+  }}
+>
+  {(isMobile ? [activePanel] : panels).map((panel) => {
           const normalized = normalizePanel(panel)
           return (
             <div

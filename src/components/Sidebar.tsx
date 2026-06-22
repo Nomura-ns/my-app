@@ -1,5 +1,6 @@
 import type { Theme, PageKey } from '../types'
 import { PAGES } from '../themes'
+import { useIsMobile } from '../hooks/useMediaQuery'
 
 // =============================================
 // ミニプレビュー
@@ -106,7 +107,18 @@ type Props = {
   onToggle: () => void
 }
 
-export default function Sidebar({ theme, currentPage, sidebarOpen, onPageChange, onClose, onToggle }: Props) {
+export default function Sidebar({
+  theme,
+  currentPage,
+  sidebarOpen,
+  onPageChange,
+  onClose,
+  onToggle,
+}: Props) {
+
+  const isMobile = useIsMobile()
+
+  if (isMobile) return null
   return (
     <>
       {/* ブックマークタブ */}
