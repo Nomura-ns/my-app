@@ -95,7 +95,8 @@ export function axisInputStyle(theme: Theme, size: LayoutSize = 'desktop') {
 export function calcDynamicFrameHeight(size: LayoutSize = 'desktop'): number {
   if (typeof window === 'undefined') return LAYOUT[size].frameHeight
 
-  const windowH = window.innerHeight
+  // visualViewport があればそちらを優先（iOSのアドレスバー収縮対策）
+  const windowH = window.visualViewport?.height ?? window.innerHeight
 
   if (size === 'mobile') {
   const windowH = window.innerHeight
