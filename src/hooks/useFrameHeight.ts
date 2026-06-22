@@ -40,12 +40,13 @@ export function useFrameHeight(layoutSize: LayoutSize): number {
   update(true)
 
   // visualViewport があればそちらを監視
-  const vv = window.visualViewport
-  if (vv && layoutSize === 'mobile') {
-    vv.addEventListener('resize', onResize)
-  } else {
-    window.addEventListener('resize', onResize)
-  }
+ const vv = window.visualViewport
+if (vv && layoutSize === 'mobile') {
+  // resizeは監視しない（アドレスバー収縮対策）
+  // vv.addEventListener('resize', onResize)  ← コメントアウト
+} else {
+  window.addEventListener('resize', onResize)
+}
   window.addEventListener('orientationchange', onOrientation)
 
   return () => {
