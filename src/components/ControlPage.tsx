@@ -38,25 +38,46 @@ function buildSteps(): MainStep[] {
   }))
 }
 
-function useCardHeights() {
+// =============================================
+// 画面幅判定（モバイル/PC）
+// =============================================
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  )
+
+  useEffect(() => {
+    function calc() {
+      setIsMobile(window.innerWidth < 768)
+    }
+    calc()
+    window.addEventListener('resize', calc)
+    return () => window.removeEventListener('resize', calc)
+  }, [])
+
+  return isMobile
+}
+
+function useCardHeights(isMobile: boolean) {
   const [heights, setHeights] = useState({ active: 400, inactive: 80, arrow: 32 })
 
   useEffect(() => {
     function calc() {
       const windowH = window.innerHeight
       const headerBarH = 57
-      const pageHeaderH = 56
-      const pagePaddingH = 32
-      const arrowH = 32
-      const inactiveH = 80
-      const available = windowH - headerBarH - pageHeaderH - pagePaddingH - (arrowH * 2) - (inactiveH * 2)
-      const activeH = Math.max(available, 200)
+      const pageHeaderH = isMobile ? 88 : 56
+      const pagePaddingH = isMobile ? 16 : 32
+      const arrowH = isMobile ? 20 : 32
+      const inactiveH = isMobile ? 44 : 80
+      const bottomNavH = isMobile ? 56 : 0
+      const available = windowH - headerBarH - pageHeaderH - pagePaddingH - (arrowH * 2) - (inactiveH * 2) - bottomNavH
+      const activeH = Math.max(available, isMobile ? 220 : 200)
       setHeights({ active: activeH, inactive: inactiveH, arrow: arrowH })
     }
     calc()
     window.addEventListener('resize', calc)
     return () => window.removeEventListener('resize', calc)
-  }, [])
+  }, [isMobile])
 
   return heights
 }
@@ -155,19 +176,136 @@ function ActionSimulation({ name, theme, activeSubIndex, height }: {
 }
 
 // =============================================
-// メインカード
+// 小項目（PC版：全件横並び表示）
 // =============================================
-function StepCard({ step, theme, isActive, isPrev, activeCardHeight }: {
-  step: MainStep; theme: Theme; isActive: boolean; isPrev: boolean; activeCardHeight: number
+function SubStepsDesktop({ step, isActive, theme }: {
+  step: MainStep; isActive: boolean; theme: Theme
 }) {
-  const simHeight = Math.floor(activeCardHeight * 0.60)
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '4px',
+      flexWrap: 'nowrap', justifyContent: 'center',
+      marginBottom: isActive ? '8px' : '0px',
+      flexShrink: 0, overflow: 'hidden',
+    }}>
+      {step.subSteps.map((sub, i) => {
+        const isDone = i < step.activeSubIndex || (step.status === 'done')
+        const isCurrent = isActive && i === step.activeSubIndex
+        return (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {i > 0 && (
+              <span style={{ color: isDone ? theme.accent : theme.border, fontSize: '12px', opacity: 0.7 }}>▶</span>
+            )}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '4px',
+              padding: '3px 8px', borderRadius: '999px',
+              background: isCurrent ? `${theme.accent}22` : isDone ? `${theme.subtext}11` : 'transparent',
+              border: `1px solid ${isCurrent ? theme.accent : isDone ? theme.subtext + '44' : theme.border + '44'}`,
+              transition: 'all 0.3s',
+            }}>
+              <div style={{
+                width: '5px', height: '5px', borderRadius: '50%',
+                background: isCurrent ? theme.accent : isDone ? theme.subtext : theme.border,
+                boxShadow: isCurrent ? `0 0 4px ${theme.accent}` : 'none', flexShrink: 0,
+              }} />
+              <span style={{
+                fontSize: '17px',
+                color: isCurrent ? theme.accent : isDone ? theme.text : theme.subtext,
+                fontWeight: isCurrent ? 'bold' : 'normal', whiteSpace: 'nowrap',
+              }}>
+                {sub.name}
+              </span>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// =============================================
+// 小項目（モバイル版：現在実行中のみ表示＋前後はドット表示）
+// =============================================
+function SubStepsMobile({ step, isActive, theme }: {
+  step: MainStep; isActive: boolean; theme: Theme
+}) {
+  if (!isActive) return null
+
+  const currentSub = step.subSteps[step.activeSubIndex]
+  const pastCount = step.activeSubIndex
+  const futureCount = step.subSteps.length - step.activeSubIndex - 1
 
   return (
     <div style={{
-      border: isActive ? `2px solid ${theme.accent}` : `1px solid ${theme.border}`,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
+      marginBottom: '8px', flexShrink: 0,
+    }}>
+      {/* 現在実行中の小項目のみフル表示 */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '6px',
+        padding: '5px 14px', borderRadius: '999px',
+        background: `${theme.accent}22`,
+        border: `1px solid ${theme.accent}`,
+      }}>
+        <div style={{
+          width: '6px', height: '6px', borderRadius: '50%',
+          background: theme.accent, boxShadow: `0 0 4px ${theme.accent}`, flexShrink: 0,
+        }} />
+        <span style={{ fontSize: '15px', color: theme.accent, fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+          {currentSub?.name}
+        </span>
+      </div>
+
+      {/* 過去・未来は折りたたんでドットのみ表示 */}
+      {(pastCount > 0 || futureCount > 0) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '11px', color: theme.subtext }}>
+          {pastCount > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+              <div style={{ display: 'flex', gap: '2px' }}>
+                {Array.from({ length: pastCount }).map((_, i) => (
+                  <div key={i} style={{
+                    width: '4px', height: '4px', borderRadius: '50%',
+                    background: theme.subtext, opacity: 0.5,
+                  }} />
+                ))}
+              </div>
+              <span style={{ opacity: 0.6 }}>完了{pastCount}</span>
+            </div>
+          )}
+          {futureCount > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+              <span style={{ opacity: 0.6 }}>残り{futureCount}</span>
+              <div style={{ display: 'flex', gap: '2px' }}>
+                {Array.from({ length: futureCount }).map((_, i) => (
+                  <div key={i} style={{
+                    width: '4px', height: '4px', borderRadius: '50%',
+                    border: `1px solid ${theme.border}`,
+                  }} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// =============================================
+// メインカード
+// =============================================
+function StepCard({ step, theme, isActive, isPrev, activeCardHeight, isMobile }: {
+  step: MainStep; theme: Theme; isActive: boolean; isPrev: boolean; activeCardHeight: number; isMobile: boolean
+}) {
+  const simHeight = Math.floor(activeCardHeight * (isMobile ? 0.55 : 0.60))
+
+  return (
+    <div style={{
+      borderWidth: isActive ? '2px' : '1px',
+      borderColor: isActive ? theme.accent : theme.border,
       borderStyle: step.status === 'waiting' ? 'dashed' : 'solid',
-      borderRadius: '16px',
-      padding: isActive ? '14px 24px' : '8px 16px',
+      borderRadius: isMobile ? '12px' : '16px',
+      padding: isActive ? (isMobile ? '10px 14px' : '14px 24px') : (isMobile ? '6px 10px' : '8px 16px'),
       background: isActive ? theme.surface : isPrev ? `${theme.surface}88` : 'transparent',
       opacity: step.status === 'waiting' ? 0.5 : 1,
       boxShadow: isActive ? `0 0 24px ${theme.accent}44` : 'none',
@@ -179,9 +317,9 @@ function StepCard({ step, theme, isActive, isPrev, activeCardHeight }: {
     }}>
 
       {/* ロボットバッジ + タイトル */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: isActive ? '8px' : '4px', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '10px', marginBottom: isActive ? '8px' : '4px', flexShrink: 0 }}>
         <span style={{
-          fontSize: isActive ? '16px' : '12px', padding: '2px 8px', borderRadius: '999px',
+          fontSize: isActive ? (isMobile ? '12px' : '16px') : '11px', padding: '2px 8px', borderRadius: '999px',
           background: step.robot === 'ロボット2' ? '#f4727233' : `${theme.accent}33`,
           color: step.robot === 'ロボット2' ? '#f47272' : theme.accent,
           border: `1px solid ${step.robot === 'ロボット2' ? '#f4727266' : `${theme.accent}66`}`,
@@ -190,13 +328,13 @@ function StepCard({ step, theme, isActive, isPrev, activeCardHeight }: {
           {step.robot}
         </span>
         <span style={{
-          fontSize: isActive ? '22px' : '15px', fontWeight: 'bold', color: theme.text,
+          fontSize: isActive ? (isMobile ? '16px' : '22px') : (isMobile ? '13px' : '15px'), fontWeight: 'bold', color: theme.text,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {step.name}
         </span>
         <span style={{
-          fontSize: isActive ? '14px' : '12px', padding: '2px 8px', borderRadius: '999px', marginLeft: 'auto', flexShrink: 0,
+          fontSize: isActive ? (isMobile ? '11px' : '14px') : '11px', padding: '2px 8px', borderRadius: '999px', marginLeft: 'auto', flexShrink: 0,
           background: isActive ? `${theme.accent}33` : step.status === 'done' ? `${theme.subtext}22` : `${theme.border}44`,
           color: isActive ? theme.accent : theme.subtext,
         }}>
@@ -204,49 +342,16 @@ function StepCard({ step, theme, isActive, isPrev, activeCardHeight }: {
         </span>
       </div>
 
-      {/* 小項目（横並び） */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '4px',
-        flexWrap: 'nowrap', justifyContent: 'center',
-        marginBottom: isActive ? '8px' : '0px',
-        flexShrink: 0, overflow: 'hidden',
-      }}>
-        {step.subSteps.map((sub, i) => {
-          const isDone = i < step.activeSubIndex || (step.status === 'done')
-          const isCurrent = isActive && i === step.activeSubIndex
-          return (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              {i > 0 && (
-                <span style={{ color: isDone ? theme.accent : theme.border, fontSize: '12px', opacity: 0.7 }}>▶</span>
-              )}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '4px',
-                padding: '3px 8px', borderRadius: '999px',
-                background: isCurrent ? `${theme.accent}22` : isDone ? `${theme.subtext}11` : 'transparent',
-                border: `1px solid ${isCurrent ? theme.accent : isDone ? theme.subtext + '44' : theme.border + '44'}`,
-                transition: 'all 0.3s',
-              }}>
-                <div style={{
-                  width: '5px', height: '5px', borderRadius: '50%',
-                  background: isCurrent ? theme.accent : isDone ? theme.subtext : theme.border,
-                  boxShadow: isCurrent ? `0 0 4px ${theme.accent}` : 'none', flexShrink: 0,
-                }} />
-                <span style={{
-                  fontSize: '17px',
-                  color: isCurrent ? theme.accent : isDone ? theme.text : theme.subtext,
-                  fontWeight: isCurrent ? 'bold' : 'normal', whiteSpace: 'nowrap',
-                }}>
-                  {sub.name}
-                </span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
+      {/* 小項目（モバイル/PCで表示を切替） */}
+      {isMobile ? (
+        <SubStepsMobile step={step} isActive={isActive} theme={theme} />
+      ) : (
+        <SubStepsDesktop step={step} isActive={isActive} theme={theme} />
+      )}
 
       {/* シミュレーション（現在のみ） */}
       {isActive && (
-        <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+        <div style={{ height: `${simHeight}px`, flexShrink: 0, overflow: 'hidden' }}>
           <ActionSimulation
             name={step.name}
             theme={theme}
@@ -258,7 +363,7 @@ function StepCard({ step, theme, isActive, isPrev, activeCardHeight }: {
 
       {/* 時間表示 */}
       {(step.startTime !== '—' || step.endTime) && (
-        <div style={{ display: 'flex', gap: '16px', fontSize: '13px', color: theme.subtext, marginTop: '6px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: '16px', fontSize: isMobile ? '11px' : '13px', color: theme.subtext, marginTop: '6px', flexShrink: 0 }}>
           {step.startTime !== '—' && <span>開始: {step.startTime}</span>}
           {step.endTime && <span>終了: {step.endTime}</span>}
         </div>
@@ -277,7 +382,8 @@ export default function ControlPage({ theme }: Props) {
   const cycleRef = useRef(0)
   const spinUntilRef = useRef(0)
   const startTimeRef = useRef<Date>(new Date())
-  const cardHeights = useCardHeights()
+  const isMobile = useIsMobile()
+  const cardHeights = useCardHeights(isMobile)
 
   const [steps, setSteps] = useState<MainStep[]>(stepsRef.current)
   const [cycleIndex, setCycleIndex] = useState(0)
@@ -369,11 +475,12 @@ export default function ControlPage({ theme }: Props) {
 
   return (
     <div style={{
-      padding: '16px 40px',
+      padding: isMobile ? '10px 12px' : '16px 40px',
+      paddingBottom: isMobile ? '12px' : undefined,
       color: theme.text,
       maxWidth: '1200px',
       margin: '0 auto',
-      height: 'calc(100vh - 57px)',
+      height: isMobile ? 'calc(100vh - 57px - 56px)' : 'calc(100vh - 57px)',
       display: 'flex',
       flexDirection: 'column',
       boxSizing: 'border-box',
@@ -381,24 +488,42 @@ export default function ControlPage({ theme }: Props) {
     }}>
 
       {/* ヘッダー */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', flexWrap: 'wrap', flexShrink: 0 }}>
-        <h2 style={{ fontSize: '16px', color: theme.subtext, margin: 0, fontWeight: 'normal', letterSpacing: '0.1em' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '12px',
+        marginBottom: isMobile ? '8px' : '12px', flexWrap: 'wrap', flexShrink: 0,
+      }}>
+        <h2 style={{
+          fontSize: isMobile ? '13px' : '16px', color: theme.subtext, margin: 0,
+          fontWeight: 'normal', letterSpacing: '0.1em', width: isMobile ? '100%' : 'auto',
+        }}>
           ロボット動作シーケンス
         </h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: `${theme.accent}22`, border: `1px solid ${theme.accent}66`, borderRadius: '999px', padding: '4px 12px', fontSize: '13px' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '6px', background: `${theme.accent}22`,
+          border: `1px solid ${theme.accent}66`, borderRadius: '999px',
+          padding: isMobile ? '3px 9px' : '4px 12px', fontSize: isMobile ? '11px' : '13px',
+        }}>
           <span style={{ color: theme.accent, fontWeight: 'bold' }}>{doneCount}</span>
           <span style={{ color: theme.subtext }}>/</span>
           <span style={{ color: theme.text, fontWeight: 'bold' }}>{steps.length}</span>
-          <span style={{ color: theme.subtext, fontSize: '12px', marginLeft: '4px' }}>完了</span>
+          <span style={{ color: theme.subtext, fontSize: isMobile ? '10px' : '12px', marginLeft: '4px' }}>完了</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: `${theme.accent}22`, border: `1px solid ${theme.accent}66`, borderRadius: '999px', padding: '4px 12px', fontSize: '13px' }}>
-          <span style={{ color: theme.subtext, fontSize: '12px' }}>サイクル</span>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '6px', background: `${theme.accent}22`,
+          border: `1px solid ${theme.accent}66`, borderRadius: '999px',
+          padding: isMobile ? '3px 9px' : '4px 12px', fontSize: isMobile ? '11px' : '13px',
+        }}>
+          <span style={{ color: theme.subtext, fontSize: isMobile ? '10px' : '12px' }}>サイクル</span>
           <span style={{ color: theme.accent, fontWeight: 'bold' }}>{cycleIndex + 1}</span>
           <span style={{ color: theme.subtext }}>/</span>
           <span style={{ color: theme.text, fontWeight: 'bold' }}>{CYCLE_COUNT}</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: `${theme.accent}22`, border: `1px solid ${theme.accent}66`, borderRadius: '999px', padding: '4px 12px', fontSize: '13px' }}>
-          <span style={{ color: theme.subtext, fontSize: '12px' }}>総経過時間</span>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '8px', background: `${theme.accent}22`,
+          border: `1px solid ${theme.accent}66`, borderRadius: '999px',
+          padding: isMobile ? '3px 9px' : '4px 12px', fontSize: isMobile ? '11px' : '13px',
+        }}>
+          <span style={{ color: theme.subtext, fontSize: isMobile ? '10px' : '12px' }}>総経過時間</span>
           <span style={{ color: theme.accent, fontWeight: 'bold', fontFamily: 'monospace' }}>{formatTime(totalSeconds)}</span>
         </div>
       </div>
@@ -415,7 +540,7 @@ export default function ControlPage({ theme }: Props) {
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: `${cardHeights.arrow}px` }}>
                   {i === 1 && prevStep === null ? null : (
                     <div style={{
-                      fontSize: '20px',
+                      fontSize: isMobile ? '14px' : '20px',
                       color: i === 1 ? theme.accent : transitioning ? theme.accent : theme.border,
                       opacity: i === 1 ? 0.8 : transitioning ? 1 : 0.3,
                       animation: i === 2 && transitioning ? 'blink 0.4s ease-in-out infinite' : 'none',
@@ -427,7 +552,7 @@ export default function ControlPage({ theme }: Props) {
               {step === null ? (
                 <div style={{
                   border: `1px dashed ${theme.border}`,
-                  borderRadius: '16px',
+                  borderRadius: isMobile ? '12px' : '16px',
                   height: `${cardHeights.inactive}px`,
                   opacity: 0.15,
                 }} />
@@ -438,6 +563,7 @@ export default function ControlPage({ theme }: Props) {
                   isActive={isActive}
                   isPrev={position === 'prev'}
                   activeCardHeight={cardHeights.active}
+                  isMobile={isMobile}
                 />
               )}
             </div>

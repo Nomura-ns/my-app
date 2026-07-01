@@ -399,83 +399,78 @@ useEffect(() => {
       </div>
      )}  
        {/* ✅ モバイル時のパネル選択タブ */}
-      {isMobile && (
         <div style={{
-          display: 'flex',
-          gap: '8px',
-          marginBottom: '12px',
-        }}>
-          {panels.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setActivePanelId(p.id)}
-              style={{
-                flex: 1,
-                padding: '6px 0',
-                fontSize: '12px',
-                borderRadius: '6px',
-                border: `1px solid ${theme.border}`,
-                background: activePanelId === p.id ? theme.accent : theme.surface,
-                color: activePanelId === p.id ? '#fff' : theme.text,
-                cursor: 'pointer',
-                fontWeight: activePanelId === p.id ? 'bold' : 'normal',
-              }}
-            >
-              パネル {p.id}
-            </button>
-          ))}
-        </div>
-      )}
-      <div
+  display: 'flex',
+  gap: '8px',
+  marginBottom: '12px',
+}}>
+  {panels.map((p) => (
+    <button
+      key={p.id}
+      onClick={() => setActivePanelId(p.id)}
+      style={{
+        flex: 1,
+        padding: '6px 0',
+        fontSize: '12px',
+        borderRadius: '6px',
+        border: `1px solid ${theme.border}`,
+        background: activePanelId === p.id ? theme.accent : theme.surface,
+        color: activePanelId === p.id ? '#fff' : theme.text,
+        cursor: 'pointer',
+        fontWeight: activePanelId === p.id ? 'bold' : 'normal',
+      }}
+    >
+      パネル {p.id}
+    </button>
+  ))}
+</div> 
+
+<div
   style={{
     display: 'grid',
-
-    gridTemplateColumns: isMobile
-      ? '1fr'
-      : 'repeat(2, minmax(0, 1fr))',
-
+    gridTemplateColumns: '1fr',
     gap: '24px',
     width: '100%',
     minWidth: 0,
   }}
 >
-  {(isMobile ? [activePanel] : panels).map((panel) => {
-          const normalized = normalizePanel(panel)
-          return (
-            <div
-              key={panel.id}
-              className="panel-card"
-              style={{
-                position: 'relative',
-                background: theme.surface,
-                border: `1px solid ${theme.border}`,
-              }}
-            >
-              <PanelAxisControls
-                panelId={panel.id}
-                xAxis={normalized.xAxis}
-                yAddresses={normalized.yAddresses}
-                onXAxisChange={(v) => handleXAxisChange(panel.id, v)}
-                onYAddressesChange={(addrs) =>
-                  updatePanel(panel.id, { yAddresses: normalizeAddresses(addrs) })
-                }
-                theme={theme}
-                layoutSize={layoutSize}
-              />
+  {[activePanel].map((panel) => {
+    const normalized = normalizePanel(panel)
+    return (
+      <div
+        key={panel.id}
+        className="panel-card"
+        style={{
+          position: 'relative',
+          background: theme.surface,
+          border: `1px solid ${theme.border}`,
+        }}
+      >
+        <PanelAxisControls
+          panelId={panel.id}
+          xAxis={normalized.xAxis}
+          yAddresses={normalized.yAddresses}
+          onXAxisChange={(v) => handleXAxisChange(panel.id, v)}
+          onYAddressesChange={(addrs) =>
+            updatePanel(panel.id, { yAddresses: normalizeAddresses(addrs) })
+          }
+          theme={theme}
+          layoutSize={layoutSize}
+        />
 
-              <PanelChart
-                panel={normalized}
-                displayData={displayData}
-                theme={theme}
-                isPlaying={isPlaying}
-                layoutSize={layoutSize}
-                onYRangeChange={(yRange) => updatePanel(panel.id, { yRange })}
-                onXRangeChange={(xRange) => updatePanel(panel.id, { xRange })}
-              />
-            </div>
-          )
-        })}
+        <PanelChart
+          panel={normalized}
+          displayData={displayData}
+          theme={theme}
+          isPlaying={isPlaying}
+          layoutSize={layoutSize}
+          onYRangeChange={(yRange) => updatePanel(panel.id, { yRange })}
+          onXRangeChange={(xRange) => updatePanel(panel.id, { xRange })}
+        />
       </div>
-    </div>
-  )
-}
+    )
+  })}
+</div>
+</div>
+    )
+  }

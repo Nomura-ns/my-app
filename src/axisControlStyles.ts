@@ -119,10 +119,8 @@ export function calcDynamicFrameHeight(size: LayoutSize = 'desktop'): number {
   const paddingH = 35 * 2
   const controlH = 44
   const cardPaddingH = 12 * 2
-  const gapH = 24
-  const rows = 2
 
-  const available = windowH - headerH - statusH - paddingH - gapH
-  const perPanel = Math.floor(available / rows) - controlH - cardPaddingH - 8
-  return Math.max(perPanel, 200)
+  const available = windowH - headerH - statusH - paddingH 
+  const perPanel = available - controlH - cardPaddingH - 8
+  return Math.max(perPanel-40, 200)
 }

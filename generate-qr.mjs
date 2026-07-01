@@ -1,45 +1,61 @@
 import QRCode from 'qrcode'
+import sharp from 'sharp'
 import fs from 'fs'
-import { createCanvas } from 'canvas'
 
 const url = 'https://lucky-maamoul-37ddd8.netlify.app/'
-const qrSize = 400
+const qrSize = 500
 
-// QRコードをcanvasに描画
-const canvas = createCanvas(qrSize, qrSize)
-await QRCode.toCanvas(canvas, url, {
+// ─── 調整パラメータ ────────────────────────────────────────
+const qrColor = '#2f356eff'
+const logoAreaW = Math.floor(qrSize * 0.38)  // ロゴ幅（QR幅の38%）
+const padding = 12                           // 白背景の余白
+
+// ─── 1. QRコードをPNGバッファで生成 ──────────────────────
+const qrBuffer = await QRCode.toBuffer(url, {
   width: qrSize,
   margin: 2,
   errorCorrectionLevel: 'H',
+  color: { dark: qrColor, light: '#ffffff' },
 })
 
-// テキストを中央に描画
-const ctx = canvas.getContext('2d')
+// ─── 2. NS SLITTERロゴをリサイズ ─────────────────────────
+const resizeLogo = async (path, targetW) => {
+  const meta = await sharp(path).metadata()
+  const ratio = targetW / meta.width
+  return sharp(path)
+    .resize(targetW, Math.round(meta.height * ratio))
+    .png()
+    .toBuffer()
+}
 
-// テキストの背景（白い角丸四角）
-const text = 'NS_SLITTER'
-const fontSize = qrSize * 0.10  // フォントサイズ
-const textWidth = qrSize * 0.65  // テキスト背景の横幅 ← ここで横幅変更
-const textHeight = fontSize + 12
-const textX = (qrSize - textWidth) / 2
-const textY = (qrSize - textHeight) / 2
+const logoNsBuf  = await resizeLogo('./public/anniversary_logo_black_ns_slitter.png', logoAreaW)
+const logoNsMeta = await sharp(logoNsBuf).metadata()
 
-// 白背景
-ctx.fillStyle = '#ffffff'
-ctx.beginPath()
-ctx.roundRect(textX - 4, textY - 4, textWidth + 8, textHeight + 8, 6)
-ctx.fill()
+// ─── 3. 白背景（角丸）を作ってロゴを乗せる ───────────────
+const bgW = logoAreaW + padding * 2
+const bgH = logoNsMeta.height + padding * 2
+const roundedBg = Buffer.from(
+  `<svg width="${bgW}" height="${bgH}">
+    <rect x="0" y="0" width="${bgW}" height="${bgH}" rx="10" ry="10" fill="#2f356e"/>
+  </svg>`
+)
 
-// 赤文字
-ctx.fillStyle = '#ff0000'
-ctx.font = `900 ${fontSize}px sans-serif`
-ctx.textAlign = 'center'
-ctx.textBaseline = 'middle'
-ctx.fillText(text, qrSize / 2, qrSize / 2)
+const logoPanelBuf = await sharp(roundedBg)
+  .composite([{ input: logoNsBuf, left: padding, top: padding }])
+  .png()
+  .toBuffer()
 
-// PNGとして保存
-const buffer = canvas.toBuffer('image/png')
-fs.writeFileSync('qrcode.png', buffer)
+// ─── 4. QRの中央にロゴパネルを合成 ──────────────────────
+const x = Math.floor((qrSize - bgW) / 2)
+const y = Math.floor((qrSize - bgH) / 2)
+
+const result = await sharp(qrBuffer)
+  .composite([{ input: logoPanelBuf, left: x, top: y }])
+  .png()
+  .toBuffer()
+
+// ─── 5. 保存 ──────────────────────────────────────────────
+fs.writeFileSync('qrcode.png', result)
 fs.writeFileSync('qrcode-url.txt', `QRコードのURL: ${url}\n`)
 
 console.log('QRコードを生成しました！')

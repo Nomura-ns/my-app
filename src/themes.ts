@@ -16,4 +16,5 @@ export const THEMES: Record<ThemeKey, Theme> = {
 export const PAGES = [
   { key: 'dashboard' as const, label: 'MONITOR' },
   { key: 'control' as const, label: 'FLOW' },
+  { key: 'anomaly' as const, label: 'ALARM' },
 ]

@@ -26,56 +26,70 @@ function updateRange(
   return next
 }
 
+// PC用（横並び：ラベル→入力）
 function AxisLimitCell({
   theme,
   label,
   value,
-  labelFirst,
   layoutSize,
   onChange,
 }: {
   theme: Theme
   label: string
   value?: number
-  labelFirst?: boolean
   layoutSize: LayoutSize
   onChange: (raw: string) => void
 }) {
-  const labelEl = (
-    <span style={{ fontSize: '9px', lineHeight: 1, whiteSpace: 'nowrap', color: theme.subtext }}>
-      {label}
-    </span>
-  )
-  const inputEl = (
-    <input
-      type="number"
-      placeholder="自動"
-      title="空欄で自動スケール"
-      value={formatValue(value)}
-      onChange={(e) => onChange(e.target.value)}
-      style={axisInputStyle(theme, layoutSize)}
-    />
-  )
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '2px',
-      }}
-    >
-      {labelFirst ? (
-        <>
-          {labelEl}
-          {inputEl}
-        </>
-      ) : (
-        <>
-          {inputEl}
-          {labelEl}
-        </>
-      )}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+      <span style={{ fontSize: '10px', whiteSpace: 'nowrap', color: theme.subtext }}>
+        {label}
+      </span>
+      <input
+        type="number"
+        placeholder="自動"
+        title="空欄で自動スケール"
+        value={formatValue(value)}
+        onChange={(e) => onChange(e.target.value)}
+        style={axisInputStyle(theme, layoutSize)}
+      />
+    </div>
+  )
+}
+
+// モバイル用（縦並び：ラベル上、入力下）グラフ上に絶対配置
+function AxisLimitCellVertical({
+  theme,
+  label,
+  value,
+  layoutSize,
+  onChange,
+}: {
+  theme: Theme
+  label: string
+  value?: number
+  layoutSize: LayoutSize
+  onChange: (raw: string) => void
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px' }}>
+      <span style={{ fontSize: '9px', whiteSpace: 'nowrap', color: theme.subtext }}>
+        {label}
+      </span>
+      <input
+        type="number"
+        placeholder="自動"
+        title="空欄で自動スケール"
+        value={formatValue(value)}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          ...axisInputStyle(theme, layoutSize),
+          width: '48px',
+          height: '22px',
+          fontSize: '10px',
+          padding: '2px 4px',
+        }}
+      />
     </div>
   )
 }
@@ -88,160 +102,145 @@ type FrameProps = {
   xRange?: AxisRange
   layoutSize?: LayoutSize
   frameHeight?: number
-  xInputLeft?: number   // X軸最小入力のleft位置（省略時はxMinLeftを使用）
-  xInputRight?: number  // X軸最大入力のright位置（省略時はchartMargin.rightを使用）
-  yInputTop?: number    // Y軸最大入力のtop位置（省略時はchartMargin.topを使用）
-  yInputBottom?: number // Y軸最小入力のbottom位置（省略時はchartMargin.bottomを使用）
+  xInputLeft?: number
+  xInputRight?: number
+  yInputTop?: number
+  yInputBottom?: number
   onYRangeChange: (range: AxisRange | undefined) => void
   onXRangeChange: (range: AxisRange | undefined) => void
   children: ReactNode
   noDataOverlay?: ReactNode
 }
 
-/**
- * 軸入力をプロット領域の端（Y軸上下・X軸左右）に合わせて配置。
- * グラフは枠いっぱいに描画し、入力は余白に重ねる。
- * xInputLeft / xInputRight / yInputTop / yInputBottom を指定することで、
- * 各軸入力位置をグラフ余白と独立して制御できる。
- */
 export default function ChartAxisFrame({
   theme,
   showXRange,
-  chartMargin,
   yRange,
   xRange,
   layoutSize = 'desktop',
-  frameHeight: framHeightProp,
-  xInputLeft,
-  xInputRight,
-  yInputTop,
-  yInputBottom,
+  frameHeight: frameHeightProp,
   onYRangeChange,
   onXRangeChange,
   children,
   noDataOverlay,
 }: FrameProps) {
-  const { top, right, bottom } = chartMargin
   const { frameHeight: defaultHeight, xMinLeft } = getLayoutConfig(layoutSize)
-  const frameHeight = framHeightProp ?? defaultHeight
-
-  // 各軸入力位置：明示指定がなければグラフ余白由来の値にフォールバック
-  const resolvedXInputLeft = xInputLeft ?? xMinLeft
-  const resolvedXInputRight = xInputRight ?? right
-  const resolvedYInputTop = yInputTop ?? top
-  const resolvedYInputBottom = yInputBottom ?? bottom
+  const frameHeight = frameHeightProp ?? defaultHeight
+  const isMobile = layoutSize === 'mobile'
 
   return (
-    <div
-      style={{
-        position: 'relative',
-        height: frameHeight,
-        width: '100%',
-        border: `1px solid ${theme.border}`,
-        borderRadius: '4px',
-        background: theme.bg,
-        overflow: 'hidden',
-        boxSizing: 'border-box',
-      }}
-    >
-      <div style={{ width: '100%', height: '100%' }}>{children}</div>
-
-      {/* Y軸最大（上） */}
+    <div style={{ width: '100%' }}>
+      {/* グラフ本体 */}
       <div
         style={{
-          position: 'absolute',
-          left: 4,
-          top: resolvedYInputTop,
-          zIndex: 10,
-          transform: 'translateY(-2px)',
+          position: 'relative',
+          height: frameHeight,
+          width: '100%',
+          border: `1px solid ${theme.border}`,
+          borderRadius: '4px 4px 0 0',
+          background: theme.bg,
+          overflow: 'hidden',
+          boxSizing: 'border-box',
         }}
       >
-        <AxisLimitCell
-          theme={theme}
-          label="Y軸最大"
-          value={yRange?.max}
-          labelFirst
-          layoutSize={layoutSize}
-          onChange={(raw) => onYRangeChange(updateRange(yRange, 'max', raw))}
-        />
+        <div style={{ width: '100%', height: '100%' }}>{children}</div>
+
+        {/* モバイル時：Y軸最大/最小をグラフ上に絶対配置 */}
+        {isMobile && (
+          <>
+            <div style={{ position: 'absolute', top: 6, left: 6, zIndex: 10 }}>
+              <AxisLimitCellVertical
+                theme={theme}
+                label="Y軸最大"
+                value={yRange?.max}
+                layoutSize={layoutSize}
+                onChange={(raw) => onYRangeChange(updateRange(yRange, 'max', raw))}
+              />
+            </div>
+            <div style={{ position: 'absolute', bottom: 6, left: 6, zIndex: 10 }}>
+              <AxisLimitCellVertical
+                theme={theme}
+                label="Y軸最小"
+                value={yRange?.min}
+                layoutSize={layoutSize}
+                onChange={(raw) => onYRangeChange(updateRange(yRange, 'min', raw))}
+              />
+            </div>
+          </>
+        )}
+
+        {/* モバイルではnoDataOverlayを表示しない */}
+        {noDataOverlay && !isMobile && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 5,
+              pointerEvents: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transform: `translate(${xMinLeft / 2}px, 0)`,
+            }}
+          >
+            {noDataOverlay}
+          </div>
+        )}
       </div>
 
-      {/* Y軸最小（下） */}
+      {/* 軸入力バー（グラフ下）：PC版はここにY軸入力、モバイルはX軸のみ（あれば） */}
       <div
         style={{
-          position: 'absolute',
-          left: 4,
-          bottom: resolvedYInputBottom,
-          zIndex: 10,
-          transform: 'translateY(2px)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          padding: '6px 10px',
+          background: theme.surface,
+          borderLeft: `1px solid ${theme.border}`,
+          borderRight: `1px solid ${theme.border}`,
+          borderBottom: `1px solid ${theme.border}`,
+          borderTop: 'none',
+          borderRadius: '0 0 4px 4px',
+          flexWrap: 'wrap',
         }}
       >
-        <AxisLimitCell
-          theme={theme}
-          label="Y軸最小"
-          value={yRange?.min}
-          labelFirst
-          layoutSize={layoutSize}
-          onChange={(raw) => onYRangeChange(updateRange(yRange, 'min', raw))}
-        />
+        {!isMobile && (
+          <>
+            <AxisLimitCell
+              theme={theme}
+              label="Y軸最大"
+              value={yRange?.max}
+              layoutSize={layoutSize}
+              onChange={(raw) => onYRangeChange(updateRange(yRange, 'max', raw))}
+            />
+            <AxisLimitCell
+              theme={theme}
+              label="Y軸最小"
+              value={yRange?.min}
+              layoutSize={layoutSize}
+              onChange={(raw) => onYRangeChange(updateRange(yRange, 'min', raw))}
+            />
+          </>
+        )}
+        {showXRange && (
+          <>
+            <AxisLimitCell
+              theme={theme}
+              label="X軸最大"
+              value={xRange?.max}
+              layoutSize={layoutSize}
+              onChange={(raw) => onXRangeChange(updateRange(xRange, 'max', raw))}
+            />
+            <AxisLimitCell
+              theme={theme}
+              label="X軸最小"
+              value={xRange?.min}
+              layoutSize={layoutSize}
+              onChange={(raw) => onXRangeChange(updateRange(xRange, 'min', raw))}
+            />
+          </>
+        )}
       </div>
-
-      {/* X軸最小（左） */}
-      {showXRange && (
-        <div
-          style={{
-            position: 'absolute',
-            left: resolvedXInputLeft,
-            bottom: 4,
-            zIndex: 10,
-          }}
-        >
-          <AxisLimitCell
-            theme={theme}
-            label="X軸最小"
-            value={xRange?.min}
-            layoutSize={layoutSize}
-            onChange={(raw) => onXRangeChange(updateRange(xRange, 'min', raw))}
-          />
-        </div>
-      )}
-
-      {/* X軸最大（右） */}
-      {showXRange && (
-        <div
-          style={{
-            position: 'absolute',
-            right: resolvedXInputRight,
-            bottom: 4,
-            zIndex: 10,
-          }}
-        >
-          <AxisLimitCell
-            theme={theme}
-            label="X軸最大"
-            value={xRange?.max}
-            layoutSize={layoutSize}
-            onChange={(raw) => onXRangeChange(updateRange(xRange, 'max', raw))}
-          />
-        </div>
-      )}
-
-      {noDataOverlay && (
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            zIndex: 5,
-            pointerEvents: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transform: `translate(${xMinLeft / 2}px, -${(top - bottom) / 2}px)`,
-          }}
-        >
-          {noDataOverlay}
-        </div>
-      )}
     </div>
   )
 }

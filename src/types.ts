@@ -16,7 +16,7 @@ export type Theme = {
   logo: string
 }
 
-export type PageKey = 'dashboard' | 'control'
+export type PageKey = 'dashboard' | 'control' | 'anomaly'
 
 export type DataPoint = {
   time: string
@@ -53,3 +53,4 @@ export type RobotAction = {
   endTime?: string
   progress?: number
 }
+
